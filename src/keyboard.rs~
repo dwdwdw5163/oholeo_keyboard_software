@@ -1,0 +1,81 @@
+use serde::{Serialize, Deserialize};
+
+
+pub const WIDTH: u32 = 64;
+pub const HEIGHT: u32 = 64;
+
+
+pub const KEYBOARD_CHARS: [&str;64] = [
+    "Esc", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "=", "Backspace", 
+    "Tab", "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "[", "]", "\\",
+    "Caps", "A", "S", "D", "F", "G", "H", "J", "K", "L", ";", ",", "Enter", 
+    "LShift", "Z", "X", "C", "V", "B", "N", "M","<", ">", "/", "RS", "⬆", "Del", 
+    "Ctrl", "Win", "Alt", "Space", "RAlt", "Fn", "⬅", "⬇", "➡",
+];
+
+#[derive(Serialize, Deserialize)]
+pub struct MessageArgs<'a> {
+    /// variable name should be the same as backend
+    pub payload: &'a str,
+}
+    
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Key {
+    pub index: u32,
+    pub bind_key: u32,
+    /// 0: default; 1: RT
+    pub mode: u32,
+    /// 0: initial travel 1: dynamic trigger travel 2: dynamic reset travel
+    pub value: (u32, u32, u32),
+    pub position: (u32, u32),
+    pub size: (u32, u32),
+    pub selected: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Keyboard {
+    pub keys: Vec<Key>,
+}
+
+impl Keyboard {
+    pub fn new() -> Keyboard {
+	let mut keys: Vec<Key> = Vec::with_capacity(64);
+	let mut x_position: u32 = 0;
+	for idx in 0..=63 {
+	    let scaler = match idx {
+		13|41 => 2.0,
+		14|27 => 1.5,
+		28 => 1.75,
+		40 => 2.25,
+		55|56|57 => 1.25,
+		58 => 6.25,
+		_ => 1.0,
+	    };
+
+	    keys.push(
+		Key { index: idx,
+		      bind_key: idx,
+		      mode: 0,
+		      value: (20,20,20),
+		      position: (x_position, match idx {
+			  0..=13 => 0,
+			  14..=27 => HEIGHT,
+			  28..=40 => 2*HEIGHT,
+			  41..=54 => 3*HEIGHT,
+			  55..=64 => 4*HEIGHT,
+			  _ => 0,}),
+		      size: ((WIDTH as f32*scaler) as u32, HEIGHT),
+		      selected: false,
+		});
+	    x_position += WIDTH + ((scaler-1.0)*WIDTH as f32) as u32;
+	    match idx {
+		13|27|40|54 => x_position = 0,
+		_ => (),   
+	    }
+	}
+	Keyboard { keys }
+    }
+
+}

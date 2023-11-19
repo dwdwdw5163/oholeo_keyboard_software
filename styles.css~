@@ -1,0 +1,69 @@
+.container {
+    width: 480px;
+    font-family: "Times New Roman";
+}
+.button { 
+    border: 2px solid #F99FB8;
+    border-radius: 5px;
+    color: #000000;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 10px 10px;
+    cursor: pointer;
+    transition-duration: 0.4s;
+}
+.button:hover {
+    background-color: #F99FB8; /* Green */
+    color: white;
+}
+
+.sidenav {
+    width: 240px;
+    height: 100%;
+    float: left;	  
+}
+
+.sidenav button {
+    border: none;
+    padding: 6px 8px 6px 16px;
+    text-decoration: none;
+    font-size: 25px;
+    color: #818181;
+    text-align: center;
+    background-color: #111
+}
+
+.sidenav button:hover {
+    color: #F99FB8;
+}
+
+.main {
+    position: relative;
+    left: 320px; /* 与sidenav的宽度相同 */
+    font-size: 28px; /* 字体放大，让页面可滚动 */
+    padding: 0px 10px;
+}
+
+.panel {
+    position: absolute;
+    top: 60%;
+    left: 320px;
+    width: 100%;
+    height: 40%;
+    background-color: #111;
+    color: #818181;
+    border: solid 5px;
+}
+
+.topnav {
+    position: absolute;
+    top: 0px;
+    left: 320px;
+    width: 100%;
+    height: 10%;
+    background-color: #333;
+    
+}
+

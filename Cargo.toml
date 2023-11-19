@@ -1,0 +1,31 @@
+[package]
+name = "tauri-app-ui"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies]
+leptos = { version = "0.5", features = ["csr"] }
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+leptos_router = { version = "0.5.2", features = ["csr"] }
+serde_json = "1.0.107"
+anyhow = "1.0.75"
+leptos_chart = { version = "0.2.2", features = ["LineChart", "csr"] }
+
+tauri-sys = { git = "https://github.com/JonasKruckenberg/tauri-sys", features = [
+  "all",
+] }
+futures = "0.3.29"
+
+
+web-sys = { version = "0.3", features =["HtmlCanvasElement"] }
+
+plotters = "0.3.5"
+plotters-canvas = "0.3.0"
+
+[workspace]
+members = ["src-tauri"]
