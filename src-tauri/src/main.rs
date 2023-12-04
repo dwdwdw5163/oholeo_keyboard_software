@@ -7,7 +7,8 @@ use std::io::{Write, BufWriter};
 use std::sync::Arc;
 use std::thread::{self, sleep};
 use tokio::sync::mpsc;
-use tokio::sync::Mutex;
+// use tokio::sync::Mutex;
+use std::sync::Mutex;
 use tracing::info;
 use tracing_subscriber;
 use std::time::Duration;
@@ -37,6 +38,7 @@ pub struct Key {
     pub position: (u32, u32),
     pub size: (u32, u32),
     pub selected: bool,
+    pub adc_value: u32,
 }
 
 
@@ -49,8 +51,15 @@ struct State {
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
-  message: String,
+    message: String,
 }
+
+#[derive(Clone, serde::Serialize)]
+struct ADC_Data {
+    index: u32,
+    value: u32,
+}
+
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 #[tauri::command]
@@ -61,7 +70,7 @@ async fn upload_settings(
     // let file = File::create("./results/keyboard.json").expect("Failed to create ");
     // let mut f = BufWriter::new(file);
     // f.write_all(payload.as_bytes()).expect("unable to write
-    let mut state_lock = state.lock().await;
+    let mut state_lock = state.lock().unwrap();
     state_lock.keys = serde_json::from_str(payload).unwrap();
     println!("{:?}", state_lock.keys[0]);
     println!("size: {}", state_lock.keys.len());
@@ -79,7 +88,7 @@ async fn set_adc_num(
     // let file = File::create("./results/keyboard.json").expect("Failed to create ");
     // let mut f = BufWriter::new(file);
     // f.write_all(payload.as_bytes()).expect("unable to write
-    let mut state_lock = state.lock().await;
+    let mut state_lock = state.lock().unwrap();
     state_lock.key_monitor = payload.parse::<u32>().unwrap();
     println!("adc moniter number: {:?}", state_lock.key_monitor);
     drop(state_lock);
@@ -97,9 +106,8 @@ fn rs2js<R: tauri::Runtime>(message: String, manager: &impl Manager<R>) {
 }
 
 
-async fn hid_thread(
-    mut input_rx: mpsc::Receiver<String>,
-    output_tx: mpsc::Sender<String>,
+fn hid_thread<R: tauri::Runtime>(
+    manager: &impl Manager<R>,
     state: Arc<Mutex<State>>
 ) {
     let api = HidApi::new().expect("Cannot create hidapi");
@@ -126,7 +134,7 @@ async fn hid_thread(
 	    println!("ok");
 	} else {
 	    loop {
-		let mut state_lock = state.lock().await;
+		let mut state_lock = state.lock().unwrap();
 		if state_lock.request_send {
 		    state_lock.request_send = false;
 		    for (page_num, keys) in state_lock.keys.chunks(4).enumerate() {
@@ -165,17 +173,15 @@ async fn hid_thread(
 			} 
 			// println!("{:?}", res);
 			send_interval+=1;
-			if send_interval>8 {send_interval=0;}
-			if send_interval==0 {
-			    let adc_data_num = state.lock().await.key_monitor as usize;
-			    output_tx.send(adc_data[adc_data_num].to_string()).await.unwrap();
-			    
-			}
+			if send_interval>=64 {send_interval=0;}
+			// output_tx.send(serde_json::to_string(&ADC_Data{index: send_interval, value: adc_data[send_interval as usize]}).unwrap()).await.unwrap();
+			manager.emit_all("adc_data", Payload{message: serde_json::to_string(&ADC_Data{index: send_interval, value: adc_data[send_interval as usize]}).unwrap()}).unwrap();
 		    }
 		} else {
 		    handle.device = None;
 		    break;
 		}
+
 
 	    }
 	    println!("Disconnected");
@@ -186,31 +192,33 @@ async fn hid_thread(
 fn main() {
     tracing_subscriber::fmt::init();
 
-    let (async_proc_input_tx, async_proc_input_rx) = mpsc::channel(1);
-    let (async_proc_output_tx, mut async_proc_output_rx) = mpsc::channel(1);
+    // let (async_proc_input_tx, async_proc_input_rx) = mpsc::channel(1);
+    // let (async_proc_output_tx, mut async_proc_output_rx) = mpsc::channel(1);
     let state = Arc::new(Mutex::new(State{keys: vec![], key_monitor: 0, request_send: false}));
     
     tauri::Builder::default()
         .manage(
 	    state.clone()
 	)
-	.manage(AsyncProcInputTx {
-            inner: Mutex::new(async_proc_input_tx),
-        })
+	// .manage(AsyncProcInputTx {
+        //     inner: Mutex::new(async_proc_input_tx),
+        // })
 	.setup(|app| {
-	    tauri::async_runtime::spawn(async move {
-		hid_thread(async_proc_input_rx, async_proc_output_tx, state.clone()).await;
-	    });
-
 	    let app_handle = app.handle();
-            tauri::async_runtime::spawn(async move {
-                loop {
-                    if let Some(output) = async_proc_output_rx.recv().await {
-                        // rs2js(output, &app_handle);
-			app_handle.emit_all("adc_data", Payload{message: output}).unwrap();
-                    }
-                }
-            });
+	    thread::spawn(move || {
+		hid_thread(&app_handle, state.clone());
+	    });
+	   
+
+
+            // tauri::async_runtime::spawn(async move {
+            //     loop {
+            //         if let Some(output) = async_proc_output_rx.recv().await {
+            //             // rs2js(output, &app_handle);
+	    // 		app_handle.emit_all("adc_data", Payload{message: output}).unwrap();
+            //         }
+            //     }
+            // });
 	    Ok(())
 	})
         .invoke_handler(tauri::generate_handler![upload_settings, set_adc_num])

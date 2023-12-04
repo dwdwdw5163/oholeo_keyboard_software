@@ -8,7 +8,7 @@ use serde::Deserialize;
 use futures::StreamExt;
 
 
-use crate::keyboard::{Keyboard, KEYBOARD_CHARS, KEYMAP, MessageArgs};
+use crate::keyboard::{Keyboard, KEYBOARD_CHARS, KEYMAP, MessageArgs, STM2RS};
 
 #[wasm_bindgen]
 extern "C" {
@@ -22,17 +22,26 @@ struct Payload {
   message: String,
 }
 
-async fn listen_on_generic_event(event_rw: RwSignal<Vec<i64>>) {
-    let mut events = event::listen::<Payload>("adc_data")
-        .await
-        .unwrap();
+#[derive(Clone, serde::Deserialize)]
+struct ADC_Data {
+    index: u32,
+    value: u32,
+}
 
-    while let Some(event) = events.next().await {
-        event_rw.update(|all_events| {
-	    all_events.push(event.payload.message.parse::<i64>().unwrap());
-	    if all_events.len()>128 { (0..all_events.len()-128).for_each(|_| {all_events.remove(0);})}
-	});
-    }
+async fn listen_on_adc_event(adc_datas: WriteSignal<[u32; 64]>) {
+    spawn_local(async move {
+	let mut events = event::listen::<Payload>("adc_data")
+            .await
+            .unwrap();
+
+	while let Some(event) = events.next().await {
+	    let adc_data: ADC_Data = serde_json::from_str(event.payload.message.as_str()).unwrap();
+	    adc_datas.update(|array| {
+		array[STM2RS[adc_data.index as usize]] = adc_data.value;
+	    });
+	}
+    });
+
 }
 
 
@@ -44,8 +53,9 @@ pub const HEIGHT: u32 = 64;
 
 #[component]
 pub fn Analog_Chart() -> impl IntoView {
+    let set_adc_datas = use_context::<WriteSignal<[u32;64]>>().unwrap();
     let event_vec = create_rw_signal::<Vec<i64>>(vec![]);
-    create_local_resource(move || event_vec, listen_on_generic_event);
+    create_resource(move || set_adc_datas, listen_on_adc_event);
     let adc_vec_memo = create_memo(move |_| event_vec.get());
     
     use plotters::prelude::*;
@@ -108,26 +118,69 @@ fn Keycap_value(
     index: usize,
 ) -> impl IntoView{
     let keyboard_state = use_context::<RwSignal<Keyboard>>().unwrap();
-    
+    let pathname = use_location().pathname;
+    let adc_datas = use_context::<ReadSignal<[u32;64]>>().unwrap();
     view! {
-	{move || match keyboard_state.get().keys[index].mode {
-	    0 => {
-		view! {
-		    <p class="text-xs">"[Default]"</p>
-		//	<p style:font-size="10px" style:height="8px" style:margin="0 0">{move || keyboard_state.get().keys[index].value.0}</p>
-		//	<p style:font-size="10px" style:height="8px" style:margin="auto">" "</p>
-		}.into_view()
-	    },
-	    1 => {
-		view! {<p class="text-xs">"[RT]"</p>
-		    //   <p style:font-size="10px" style:height="8px" style:margin="0 0">{move || keyboard_state.get().keys[index].value.1}</p>
-		    //   <p style:font-size="10px" style:height="8px" style:margin="0 0">{move || keyboard_state.get().keys[index].value.2}</p>
-		}.into_view()
+	<p class="m-0" style:font-weight="bold" style:font-size="20px">{move || KEYBOARD_CHARS[keyboard_state.get().keys[index].bind_key as usize]}</p>
+	{
+	    move || {
+		if pathname.get().as_str() == "/performance" {
+		    match keyboard_state.get().keys[index].mode {
+			0 => {
+			    view! {
+				<p class="mb-0" style:font-size="12px">{move || keyboard_state.get().keys[index].value.0}</p>
+				//	<p style:font-size="10px" style:height="8px" style:margin="0 0">{move || keyboard_state.get().keys[index].value.0}</p>
+				//	<p style:font-size="10px" style:height="8px" style:margin="auto">" "</p>
+			    }.into_view()
+			},
+			1 => {
+			    view! {<p style:font-size="10px">{move || keyboard_state.get().keys[index].value.1}{" "}
+				   {move || keyboard_state.get().keys[index].value.2}{" "}
+				   {move || keyboard_state.get().keys[index].value.3}</p>
+				   //   <p style:font-size="10px" style:height="8px" style:margin="0 0">{move || keyboard_state.get().keys[index].value.1}</p>
+				   //   <p style:font-size="10px" style:height="8px" style:margin="0 0">{move || keyboard_state.get().keys[index].value.2}</p>
+			    }.into_view()
+			}
+			_ => {view! {}.into_view()},
+			
+		    }
+		} else if pathname.get().as_str() == "/debug" {
+		    view! {
+			<p>{move || adc_datas.get()[index]}</p>
+		    }.into_view()
+		} else {
+		    view! {}.into_view()
+		}
 	    }
-	    _ => {view! {}.into_view()},
-	    
-	}}
+	}
     }
+
+    
+    // view! {
+    // 	{
+    // 	    move || {
+    // 		if pathname.get().as_str() == "/performance" {
+    // 		    match keyboard_state.get().keys[index].mode {
+    // 			0 => {
+    // 			    view! {
+    // 				<p class="text-xs">"[Default]"</p>
+    // 				//	<p style:font-size="10px" style:height="8px" style:margin="0 0">{move || keyboard_state.get().keys[index].value.0}</p>
+    // 				//	<p style:font-size="10px" style:height="8px" style:margin="auto">" "</p>
+    // 			    }.into_view()
+    // 			},
+    // 			1 => {
+    // 			    view! {<p class="text-xs">"[RT]"</p>
+    // 				   //   <p style:font-size="10px" style:height="8px" style:margin="0 0">{move || keyboard_state.get().keys[index].value.1}</p>
+    // 				   //   <p style:font-size="10px" style:height="8px" style:margin="0 0">{move || keyboard_state.get().keys[index].value.2}</p>
+    // 			    }.into_view()
+    // 			}
+    // 			_ => {view! {}.into_view()},
+			
+    // 		    }
+    // 		}
+    // 	    }
+    // 	}
+    // }
 }
 
 
@@ -170,12 +223,13 @@ fn KeyboardButton(
 	    style:position="relative"
 	    style:width="100%"
 	    style:top="0px"
-	// on:click=move |_| {keyboard_state.update(|Keyboard{keys, ..}| keys[index].selected = keys[index].selected.not())}
 	    on:click=on_click
-	class:active=move || keyboard_state.get().keys[index].selected>
-	    <p style:font-weight="bold" style:height="24px" style:margin="0 0">{move || KEYBOARD_CHARS[keyboard_state.get().keys[index].bind_key as usize]}</p>
+	    class:active=move || keyboard_state.get().keys[index].selected>
+
+	    <Keycap_value index/>
+	    // <p style:font-weight="bold" style:height="24px" style:margin="0 0">{move || KEYBOARD_CHARS[keyboard_state.get().keys[index].bind_key as usize]}</p>
 	    
-	    <div><Keycap_value index/></div>
+	    // <div><Keycap_value index/></div>
 	    
 	    </div>
 	    </div>

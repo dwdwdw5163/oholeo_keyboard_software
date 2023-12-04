@@ -24,7 +24,6 @@ rustup target add wasm32-unknown-unknown
 then run
 ```
 npm install -D tailwindcss
-npx tailwindcss init
 npx tailwindcss -i ./input.css -o ./style/output.css
 cargo tauri dev
 ```

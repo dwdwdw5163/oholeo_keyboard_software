@@ -9,12 +9,11 @@ leptos = { version = "0.5", features = ["csr"] }
 serde = { version = "1.0", features = ["derive"] }
 serde-wasm-bindgen = "0.6"
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
-wasm-bindgen-futures = "0.4"
-js-sys = "0.3"
+wasm-bindgen-futures = "0.4.39"
+js-sys = "0.3.6"
 leptos_router = { version = "0.5.2", features = ["csr"] }
 serde_json = "1.0.107"
 anyhow = "1.0.75"
-leptos_chart = { version = "0.2.2", features = ["LineChart", "csr"] }
 
 tauri-sys = { git = "https://github.com/JonasKruckenberg/tauri-sys", features = [
   "all",
@@ -22,7 +21,7 @@ tauri-sys = { git = "https://github.com/JonasKruckenberg/tauri-sys", features = 
 futures = "0.3.29"
 
 
-web-sys = { version = "0.3", features =["HtmlCanvasElement"] }
+web-sys = { version = "0.3.66", features = ["HtmlCanvasElement", "Hid", "Navigator", "HidDevice"] }
 
 plotters = "0.3.5"
 plotters-canvas = "0.3.0"
