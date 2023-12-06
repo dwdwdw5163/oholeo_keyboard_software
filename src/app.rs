@@ -1,7 +1,7 @@
 use leptos::*;
 use wasm_bindgen::prelude::*;
 use leptos_router::*;
-use web_sys::Hid;
+use web_sys::{Hid, HidDeviceRequestOptions};
 
 #[wasm_bindgen]
 extern "C" {
@@ -14,9 +14,27 @@ extern "C" {
 use crate::{component::*, keyboard::Keyboard};
 
 
+#[derive(Debug, Clone)]
+pub struct UiState {
+    pub activation_value: u32,
+    pub trigger_value: u32,
+    pub reset_value: u32,
+    pub lower_deadzone: u32,
+    pub mode: u32,
+}
+
+
 #[component]
 pub fn App() -> impl IntoView {
     let keyboard_state = create_rw_signal(Keyboard::new());
+    let uistate = create_rw_signal(UiState{
+	activation_value: 50,
+	trigger_value: 5,
+	reset_value: 5,
+	lower_deadzone: 35,
+	mode: 0,
+    });
+    provide_context(uistate);
     provide_context(keyboard_state);
     let (adc_datas, set_adc_datas) = create_signal([0u32; 64]);
     provide_context(adc_datas);
@@ -24,23 +42,7 @@ pub fn App() -> impl IntoView {
 	    
     let navbar_switch = create_signal(false);
 
-    // let handle = window_event_listener(ev::keypress, |ev| {
-    //     // ev is typed as KeyboardEvent automatically,
-    //     // so .code() can be called
-    //     let code = ev.time_stamp();
-    //     logging::log!("code = {code:?}");
-    // });
-    // on_cleanup(move || handle.remove());
 
-    create_local_resource(|| (), |_| async move {
-	logging::log!("start init");
-	let window = web_sys::window().unwrap();
-	let nav = window.navigator();
-	let devices_promise = nav.hid().get_devices();
-	let result = wasm_bindgen_futures::JsFuture::from(devices_promise).await;
-	logging::log!("{:?}", result);
-
-    });
 
     view! {
 	

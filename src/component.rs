@@ -6,9 +6,10 @@ use wasm_bindgen::prelude::*;
 use tauri_sys::{event, tauri};
 use serde::Deserialize;
 use futures::StreamExt;
+use web_sys::HidDevice;
 
 
-use crate::keyboard::{Keyboard, KEYBOARD_CHARS, KEYMAP, MessageArgs, STM2RS};
+use crate::{keyboard::{Keyboard, KEYBOARD_CHARS, KEYMAP, MessageArgs, STM2RS}, app::UiState};
 
 #[wasm_bindgen]
 extern "C" {
@@ -189,14 +190,20 @@ fn KeyboardButton(
     index: usize,
 ) -> impl IntoView {
     let keyboard_state = use_context::<RwSignal<Keyboard>>().unwrap();
+    let ui_state = use_context::<RwSignal<UiState>>().unwrap();
+    
     let location = use_location().pathname;
     let on_click = move |_| {
+	
+	ui_state.update(|state| {
+	    state.mode=keyboard_state.get().keys[index].mode;
+	});
 	keyboard_state.update(|Keyboard{keys, ..}| {
 	    for (idx, key) in keys.iter_mut().enumerate() {
 		if idx == index {
 		    key.selected = key.selected.not();
 		} else {
-		    key.selected = false;
+//		    key.selected = false;
 		}
 	    }
 	});
@@ -351,10 +358,64 @@ pub fn Navbar(
     let title = move || path_name.get().to_ascii_uppercase().as_str()[1..].to_string();
     let upload = move |_| {
 	spawn_local(async move {
-	    let payload = keyboard_state.get().keys;
-	    let args = to_value(&MessageArgs {payload: &serde_json::to_string_pretty(&payload).unwrap()}).unwrap();
-	    let msg = invoke("upload_settings", args).await.as_string().unwrap();
-	    logging::log!("{}", msg);
+	    #[derive(serde::Serialize)]
+	    struct Filter {
+		vendorId: Option<u16>,
+		productId: Option<u16>,
+		#[serde(rename = "usagePage")]
+		pub usage_page: Option<u16>,
+		pub usage: Option<u16>,
+	    }
+	    let window = web_sys::window().unwrap();
+	    let nav = window.navigator();
+	    let devices_promise = nav.hid()
+		.request_device(&web_sys::HidDeviceRequestOptions::new(&serde_wasm_bindgen::to_value(&[Filter{
+		    vendorId:Some(0x0484),
+		    productId:Some(0x572f),
+		    usage_page:Some(0xff00),
+		    usage:Some(1),
+		    // usage_page: None,
+		    // usage: None,
+		}]).unwrap()));
+	    let devices = wasm_bindgen_futures::JsFuture::from(devices_promise).await.unwrap();
+	    let devs_array = devices.dyn_ref::<js_sys::Array>().expect("FAILED to cast the returned value from `request_device()`.");
+	    let device: JsValue = devs_array.at(0); //interface 1
+	    let device: &HidDevice = device.dyn_ref::<HidDevice>().expect("FAILED to cast `JsValue` in array into `HidDevice`.");
+
+	    logging::log!("device:{:?}", &device);
+	    let promise = device.open();
+	    wasm_bindgen_futures::JsFuture::from(promise).await.expect("Cannot Open Device");
+	    logging::log!("device:{:?}", &device);
+
+	    let mut send_buf = [0u8; 64];
+	    for (page_num, keys) in keyboard_state.get().keys.chunks(4).enumerate() {
+		send_buf[0] = 2;
+		send_buf[1] = page_num as u8;
+		for i in 0..4 {
+ 		    send_buf[2 + i*4+0] = keys[i].value.0 as u8 | ((keys[i].mode << 7) as u8);
+		    send_buf[2 + i*4+1] = keys[i].value.1 as u8;
+		    send_buf[2 + i*4+2] = keys[i].value.2 as u8;
+		    send_buf[2 + i*4+3] = keys[i].value.3 as u8;
+		}
+		//logging::log!("test: [page: {} payload: {:?}]", page_num, &send_buf[0..18]);
+		if device.opened() {
+		    let res = wasm_bindgen_futures::JsFuture::from(device.send_report_with_u8_array(2, &mut send_buf[1..18])).await;
+		    match res {
+			Err(err) => logging::log!("{:?}", err),
+			_ => {},
+		    }
+//		    std::thread::sleep(std::time::Duration::from_millis(1));
+		} else {
+		    logging::log!("Device is not opend");
+		}
+
+	    }
+	    wasm_bindgen_futures::JsFuture::from(device.close()).await.expect("Error While Closing the Device");
+//	    logging::log!("{:?}", result);
+	    // let payload = keyboard_state.get().keys;
+	    // let args = to_value(&MessageArgs {payload: &serde_json::to_string_pretty(&payload).unwrap()}).unwrap();
+	    // let msg = invoke("upload_settings", args).await.as_string().unwrap();
+	    // logging::log!("{}", msg);
 	});
     };
 
@@ -398,6 +459,7 @@ pub fn DashBoard(
 
 #[component]
 pub fn KeySettings() -> impl IntoView {
+    let uistate = use_context::<RwSignal<UiState>>().unwrap();
 
     let activation_value = create_signal("50".to_string());
     let trigger_value = create_signal("5".to_string());
@@ -405,7 +467,7 @@ pub fn KeySettings() -> impl IntoView {
     let lower_deadzone = create_signal("35".to_string());
 
     
-    let mode = create_signal("0".to_string());
+    let mode = create_memo(move |_| uistate.get().mode);
     let keyboard_state = use_context::<RwSignal<Keyboard>>().unwrap();
     let selected_num = create_memo(move |_| keyboard_state.get().keys.iter().filter(|key| key.selected).count());
 
@@ -479,7 +541,7 @@ pub fn KeySettings() -> impl IntoView {
 	let v =  event_target_value(&ev);
 	let number = selected_num.get();
 	logging::log!("mode is {} selected: {}", v, number );
-	mode.1.set(v.clone());
+	uistate.update(|x| x.mode=v.parse::<u32>().unwrap());
 	keyboard_state.update(|Keyboard{keys, ..}| {
 	    for key in keys.iter_mut() {
 		if key.selected || number==0 {
@@ -506,7 +568,7 @@ pub fn KeySettings() -> impl IntoView {
 
 	    <div class="form-check form-check-radio">
 	    <label class="form-check-label">
-            <input class="form-check-input" type="radio" name="mode" id="mode0" value="0" checked/>
+            <input class="form-check-input" type="radio" name="mode" id="mode0" value="0" prop:checked=move || mode.get()==0/>
             "Traditional"
             <span class="circle">
             <span class="check"></span>
@@ -515,7 +577,7 @@ pub fn KeySettings() -> impl IntoView {
 	    </div>
 	    <div class="form-check form-check-radio">
 	    <label class="form-check-label">
-            <input class="form-check-input" type="radio" name="mode" id="mode1" value="1"/>
+            <input class="form-check-input" type="radio" name="mode" id="mode1" value="1" prop:checked=move || mode.get()==1/>
             "Rappid Trigger"
             <span class="circle">
             <span class="check"></span>
@@ -529,7 +591,7 @@ pub fn KeySettings() -> impl IntoView {
 
 	    <div style:width="60%">
 
-	{move || match mode.0.get().as_str() {
+	{move || match mode.get().to_string().as_str() {
 	    "0" => view! {
 		<h5>"Activation Point"</h5>
 		    <div class="form-row" style="justify-content:space-around; align-items:center;">

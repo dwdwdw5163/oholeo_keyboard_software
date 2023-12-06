@@ -16,10 +16,7 @@ pub const KEYBOARD_CHARS: [&str;64] = [
 /// index is idx of the keybuttonView, element is the index of stm32 array
 pub const KEYMAP: [usize; 64] = [15, 14, 13, 12, 44, 43, 37, 63, 59, 58, 31, 30, 29, 28, 8, 9, 10, 11, 42, 36, 35, 62, 56, 57, 24, 25, 26, 27, 3, 2, 1, 0, 41, 38, 34, 61, 55, 19, 18, 17, 16, 4, 5, 6, 7, 40, 39, 33, 60, 54, 53, 20, 21, 22, 23, 45, 46, 47, 32, 48, 49, 50, 51, 52];
 
-pub const STM2RS: [usize; 64] = [31,
-30,
-29,
-28,
+pub const STM2RS: [usize; 64] = [31,30,29,28,
 41,//Left Shift
 42,
 43,
