@@ -1,6 +1,7 @@
 use std::ops::Not;
 use leptos::*;
 use leptos_router::*;
+use plotters::coord::ranged1d::NoDefaultFormatting;
 use serde_wasm_bindgen::to_value;
 use wasm_bindgen::prelude::*;
 use tauri_sys::{event, tauri};
@@ -9,7 +10,7 @@ use futures::StreamExt;
 use web_sys::HidDevice;
 
 
-use crate::{keyboard::{Keyboard, KEYBOARD_CHARS, KEYMAP, MessageArgs, STM2RS}, app::UiState};
+use crate::{keyboard::{Keyboard, KEYBOARD_CHARS, KEYMAP, MessageArgs, STM2RS}, app::{UiState, ADC_Data}};
 
 #[wasm_bindgen]
 extern "C" {
@@ -23,27 +24,8 @@ struct Payload {
   message: String,
 }
 
-#[derive(Clone, serde::Deserialize)]
-struct ADC_Data {
-    index: u32,
-    value: u32,
-}
 
-async fn listen_on_adc_event(adc_datas: WriteSignal<[u32; 64]>) {
-    spawn_local(async move {
-	let mut events = event::listen::<Payload>("adc_data")
-            .await
-            .unwrap();
 
-	while let Some(event) = events.next().await {
-	    let adc_data: ADC_Data = serde_json::from_str(event.payload.message.as_str()).unwrap();
-	    adc_datas.update(|array| {
-		array[STM2RS[adc_data.index as usize]] = adc_data.value;
-	    });
-	}
-    });
-
-}
 
 
 pub const WIDTH: u32 = 64;
@@ -54,9 +36,9 @@ pub const HEIGHT: u32 = 64;
 
 #[component]
 pub fn Analog_Chart() -> impl IntoView {
-    let set_adc_datas = use_context::<WriteSignal<[u32;64]>>().unwrap();
+//    let set_adc_datas = use_context::<WriteSignal<[u32;64]>>().unwrap();
     let event_vec = create_rw_signal::<Vec<i64>>(vec![]);
-    create_resource(move || set_adc_datas, listen_on_adc_event);
+//    create_resource(move || set_adc_datas, listen_on_adc_event);
     let adc_vec_memo = create_memo(move |_| event_vec.get());
     
     use plotters::prelude::*;
@@ -120,7 +102,14 @@ fn Keycap_value(
 ) -> impl IntoView{
     let keyboard_state = use_context::<RwSignal<Keyboard>>().unwrap();
     let pathname = use_location().pathname;
-    let adc_datas = use_context::<ReadSignal<[u32;64]>>().unwrap();
+    let adc_datas = use_context::<ReadSignal<ADC_Data>>().unwrap();
+    let adc_data = create_memo(move |_| adc_datas.get().array[index]);
+    // let (adc_data, set_adc_data) = create_signal(0);
+    // let adc_data_cnt = create_memo(move |_| adc_datas.get().cnt);
+    // create_effect(move |_| {
+	
+    // });
+    
     view! {
 	<p class="m-0" style:font-weight="bold" style:font-size="20px">{move || KEYBOARD_CHARS[keyboard_state.get().keys[index].bind_key as usize]}</p>
 	{
@@ -147,7 +136,7 @@ fn Keycap_value(
 		    }
 		} else if pathname.get().as_str() == "/debug" {
 		    view! {
-			<p>{move || adc_datas.get()[index]}</p>
+			<p>{move || adc_data.get()}</p>
 		    }.into_view()
 		} else {
 		    view! {}.into_view()
@@ -349,6 +338,9 @@ pub fn Navbar(
 ) -> impl IntoView {
     let keyboard_state = use_context::<RwSignal<Keyboard>>().unwrap();
     let path_name = use_location().pathname;
+    let uistate = use_context::<RwSignal<UiState>>().unwrap();
+    let set_adc_datas = use_context::<WriteSignal<ADC_Data>>().unwrap();
+
     // let title = move || match path_name.get().as_str(). {
     // 	"/performance" => "Performance",
     // 	"/keymap" => "KeyMap",
@@ -366,51 +358,90 @@ pub fn Navbar(
 		pub usage_page: Option<u16>,
 		pub usage: Option<u16>,
 	    }
-	    let window = web_sys::window().unwrap();
-	    let nav = window.navigator();
-	    let devices_promise = nav.hid()
-		.request_device(&web_sys::HidDeviceRequestOptions::new(&serde_wasm_bindgen::to_value(&[Filter{
-		    vendorId:Some(0x0484),
-		    productId:Some(0x572f),
-		    usage_page:Some(0xff00),
-		    usage:Some(1),
-		    // usage_page: None,
-		    // usage: None,
-		}]).unwrap()));
-	    let devices = wasm_bindgen_futures::JsFuture::from(devices_promise).await.unwrap();
-	    let devs_array = devices.dyn_ref::<js_sys::Array>().expect("FAILED to cast the returned value from `request_device()`.");
-	    let device: JsValue = devs_array.at(0); //interface 1
-	    let device: &HidDevice = device.dyn_ref::<HidDevice>().expect("FAILED to cast `JsValue` in array into `HidDevice`.");
+	    if uistate.get().hid_device.is_none() {
+		let window = web_sys::window().unwrap();
+		let nav = window.navigator();
+		let devices_promise = nav.hid()
+		    .request_device(&web_sys::HidDeviceRequestOptions::new(&serde_wasm_bindgen::to_value(&[Filter{
+			vendorId:Some(0x0484),
+			productId:Some(0x572f),
+			// usage_page:Some(0xff00),
+			// usage:Some(0x00),
+			usage_page: None,
+			usage: None,
+		    }]).unwrap()));
+		let devices = wasm_bindgen_futures::JsFuture::from(devices_promise).await.unwrap();
+		let devs_array = devices.dyn_ref::<js_sys::Array>().expect("FAILED to cast the returned value from `request_device()`.");
+		let device: JsValue = devs_array.at(0); //interface 0
+		let device: HidDevice  = device.dyn_into().expect("FAILED to cast `JsValue` in array into `HidDevice`.");
+		//open device
+		wasm_bindgen_futures::JsFuture::from(device.open()).await.expect("Cannot Open Device");
+		//		let device: &HidDevice = device .dyn_ref::<HidDevice>().expect("FAILED to cast `JsValue` in array into `HidDevice`.");
 
-	    logging::log!("device:{:?}", &device);
-	    let promise = device.open();
-	    wasm_bindgen_futures::JsFuture::from(promise).await.expect("Cannot Open Device");
-	    logging::log!("device:{:?}", &device);
 
-	    let mut send_buf = [0u8; 64];
-	    for (page_num, keys) in keyboard_state.get().keys.chunks(4).enumerate() {
-		send_buf[0] = 2;
-		send_buf[1] = page_num as u8;
-		for i in 0..4 {
- 		    send_buf[2 + i*4+0] = keys[i].value.0 as u8 | ((keys[i].mode << 7) as u8);
-		    send_buf[2 + i*4+1] = keys[i].value.1 as u8;
-		    send_buf[2 + i*4+2] = keys[i].value.2 as u8;
-		    send_buf[2 + i*4+3] = keys[i].value.3 as u8;
-		}
-		//logging::log!("test: [page: {} payload: {:?}]", page_num, &send_buf[0..18]);
-		if device.opened() {
-		    let res = wasm_bindgen_futures::JsFuture::from(device.send_report_with_u8_array(2, &mut send_buf[1..18])).await;
-		    match res {
-			Err(err) => logging::log!("{:?}", err),
-			_ => {},
+
+		let closure = Closure::wrap(Box::new(move |e: web_sys::HidInputReportEvent| {
+		    let dataview = e.data();
+		    let rid = e.report_id();
+		    let ofs = dataview.byte_offset();
+		    let len = dataview.byte_length();
+		    let ba: Vec<u8> = (0..len).map(|i| { dataview.get_uint8(i+ofs) }).collect();
+		    if rid == 2 {
+//			logging::log!("{:?}", ba);
+			let adc_data_page = ba[0] as usize;
+			for (idx, x) in ba[1..17].iter().enumerate() {
+				if idx%2==1 {
+				    set_adc_datas.update(|v| v.array[STM2RS[idx/2 + adc_data_page*8]] += x.clone() as u32);
+				}
+				else {
+				    set_adc_datas.update(|v| v.array[STM2RS[idx/2 + adc_data_page*8]] = x.clone() as u32 *256);
+				}
+			}
+			
 		    }
-//		    std::thread::sleep(std::time::Duration::from_millis(1));
-		} else {
-		    logging::log!("Device is not opend");
-		}
+		}) as Box<dyn FnMut(web_sys::HidInputReportEvent)>);
+		device.set_oninputreport(Some(closure.as_ref().unchecked_ref()));
+		closure.forget();
+		
+		uistate.update(|state| state.hid_device=Some(device));
+	    } else {
+		if let Some(device) = uistate.get().hid_device {
 
+		    //open device
+
+		    if device.opened().not() {
+			wasm_bindgen_futures::JsFuture::from(device.open()).await.expect("Cannot Open Device");
+		    }
+
+
+		    let mut send_buf = [0u8; 64];
+		    for (page_num, keys) in keyboard_state.get().keys.chunks(4).enumerate() {
+			send_buf[0] = 2;
+			send_buf[1] = page_num as u8;
+			for i in 0..4 {
+ 			    send_buf[2 + i*4+0] = keys[i].value.0 as u8 | ((keys[i].mode << 7) as u8);
+			    send_buf[2 + i*4+1] = keys[i].value.1 as u8;
+			    send_buf[2 + i*4+2] = keys[i].value.2 as u8;
+			    send_buf[2 + i*4+3] = keys[i].value.3 as u8;
+			}
+			//logging::log!("test: [page: {} payload: {:?}]", page_num, &send_buf[0..18]);
+			if device.opened() {
+			    let res = wasm_bindgen_futures::JsFuture::from(device.send_report_with_u8_array(2, &mut send_buf[1..18])).await;
+			    match res {
+				Err(err) => logging::log!("{:?}", err),
+				_ => {},
+			    }
+			    //		    std::thread::sleep(std::time::Duration::from_millis(1));
+			} else {
+			    logging::log!("Device is not opend");
+			}
+
+		    }
+		    logging::log!("Send Report");
+		    //close device
+		    //		wasm_bindgen_futures::JsFuture::from(device.close()).await.expect("Error While Closing the Device");
+		}
 	    }
-	    wasm_bindgen_futures::JsFuture::from(device.close()).await.expect("Error While Closing the Device");
 //	    logging::log!("{:?}", result);
 	    // let payload = keyboard_state.get().keys;
 	    // let args = to_value(&MessageArgs {payload: &serde_json::to_string_pretty(&payload).unwrap()}).unwrap();
@@ -428,7 +459,13 @@ pub fn Navbar(
             <a class="navbar-brand" >{title}<div class="ripple-container"></div></a>
             </div>
 
-	    <button type="submit" class="btn btn-primary ml-auto" on:click=upload>"Save to Keyboard"</button>
+	    <button type="submit" class="btn ml-auto" class:btn-success=move||uistate.get().hid_device.is_some() on:click=upload>{move|| {
+		if uistate.get().hid_device.is_some() {
+		    "Save to Keyboard"
+		} else {
+		    "Connect"
+		}
+	    }}</button>
 	    
             <button class="navbar-toggler collapsed" class:toggled=navbar_switch.0 type="button" on:click=move |_| {navbar_switch.1.update(|n| *n = n.not()) }>
             <span class="sr-only">Toggle navigation</span>
@@ -595,26 +632,26 @@ pub fn KeySettings() -> impl IntoView {
 	    "0" => view! {
 		<h5>"Activation Point"</h5>
 		    <div class="form-row" style="justify-content:space-around; align-items:center;">
-		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange0" prop:value=activation_value.0 on:input=update_activation_value/></span>
-		    <input type="number" class="form-control" style:width="10%" prop:value=activation_value.0 on:input=update_activation_value/>
+		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange0" prop:value=move||activation_value.0.get() on:input=update_activation_value/></span>
+		    <input type="number" class="form-control" style:width="10%" prop:value=move||activation_value.0.get() on:input=update_activation_value/>
 		    </div>
 	    }.into_view(),
 	    "1" => view! {
 		<h5>"Dynamic Trigger Travel"</h5>
 		    <div class="form-row" style="justify-content:space-around; align-items:center;">
-		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange1" prop:value=trigger_value.0 on:input=update_trigger_value/></span>
-		    <input type="number" class="form-control" style:width="10%" prop:value=trigger_value.0 on:input=update_trigger_value/>
+		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange1" prop:value=move||trigger_value.0.get() on:input=update_trigger_value/></span>
+		    <input type="number" class="form-control" style:width="10%" prop:value=move||trigger_value.0.get() on:input=update_trigger_value/>
 		    </div>
 		    
 		    <h5>"Dynamic Reset Travel"</h5>
 		    <div class="form-row" style="justify-content:space-around; align-items:center;">
-		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange2" prop:value=reset_value.0 on:input=update_reset_value/></span>
-		    <input type="number" class="form-control" style:width="10%" prop:value=reset_value.0 on:input=update_reset_value/>
+		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange2" prop:value=move||reset_value.0.get() on:input=update_reset_value/></span>
+		    <input type="number" class="form-control" style:width="10%" prop:value=move||reset_value.0.get() on:input=update_reset_value/>
 		    </div>
 		    <h5>"Lower DeadZone"</h5>
 		    <div class="form-row" style="justify-content:space-around; align-items:center;">
-		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange3" prop:value=lower_deadzone.0 on:input=update_lower_deadzone/></span>
-		    <input type="number" class="form-control" style:width="10%" prop:value=lower_deadzone.0 on:input=update_lower_deadzone/>
+		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange3" prop:value=move||lower_deadzone.0.get() on:input=update_lower_deadzone/></span>
+		    <input type="number" class="form-control" style:width="10%" prop:value=move||lower_deadzone.0.get() on:input=update_lower_deadzone/>
 		    
 		    </div>
 	    }.into_view(),

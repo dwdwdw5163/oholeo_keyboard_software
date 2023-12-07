@@ -21,7 +21,7 @@ tauri-sys = { git = "https://github.com/JonasKruckenberg/tauri-sys", features = 
 futures = "0.3.29"
 
 
-web-sys = { version = "0.3.66", features = ["HtmlCanvasElement", "Hid", "Navigator", "HidDevice", "HidDeviceRequestOptions"] }
+web-sys = { version = "0.3.66", features = ["HtmlCanvasElement", "Hid", "Navigator", "HidDevice", "HidDeviceRequestOptions", "HidInputReportEvent"] }
 
 plotters = "0.3.5"
 plotters-canvas = "0.3.0"

@@ -1,7 +1,7 @@
 use leptos::*;
 use wasm_bindgen::prelude::*;
 use leptos_router::*;
-use web_sys::{Hid, HidDeviceRequestOptions};
+use web_sys::{Hid, HidDeviceRequestOptions, HidDevice};
 
 #[wasm_bindgen]
 extern "C" {
@@ -16,27 +16,26 @@ use crate::{component::*, keyboard::Keyboard};
 
 #[derive(Debug, Clone)]
 pub struct UiState {
-    pub activation_value: u32,
-    pub trigger_value: u32,
-    pub reset_value: u32,
-    pub lower_deadzone: u32,
+    pub hid_device: Option<HidDevice>,
     pub mode: u32,
 }
 
+#[derive(Debug, Clone)]
+pub struct ADC_Data {
+    pub array: [u32; 64],
+    pub cnt: usize,
+}
 
 #[component]
 pub fn App() -> impl IntoView {
     let keyboard_state = create_rw_signal(Keyboard::new());
     let uistate = create_rw_signal(UiState{
-	activation_value: 50,
-	trigger_value: 5,
-	reset_value: 5,
-	lower_deadzone: 35,
+	hid_device: None,
 	mode: 0,
     });
     provide_context(uistate);
     provide_context(keyboard_state);
-    let (adc_datas, set_adc_datas) = create_signal([0u32; 64]);
+    let (adc_datas, set_adc_datas) = create_signal(ADC_Data{array: [0u32; 64], cnt: 0});
     provide_context(adc_datas);
     provide_context(set_adc_datas);
 	    
