@@ -37,16 +37,16 @@ pub const HEIGHT: u32 = 64;
 #[component]
 pub fn Analog_Chart() -> impl IntoView {
 //    let set_adc_datas = use_context::<WriteSignal<[u32;64]>>().unwrap();
-    let event_vec = create_rw_signal::<Vec<i64>>(vec![]);
+    let event_vec = use_context::<RwSignal<Vec<u32>>>().unwrap();
 //    create_resource(move || set_adc_datas, listen_on_adc_event);
-    let adc_vec_memo = create_memo(move |_| event_vec.get());
+//    let adc_vec_memo = create_memo(move |_| event_vec.get());
     
     use plotters::prelude::*;
     use plotters_canvas::CanvasBackend;
 
     let canvas_ref = create_node_ref::<html::Canvas>();
     create_effect(move |_| {
-	let adc_datas = adc_vec_memo.get();
+	let adc_datas = event_vec.get();
 	let canvas = canvas_ref.get().unwrap();
 	let backend = CanvasBackend::with_canvas_object(canvas_ref.get().as_deref().unwrap().to_owned()).unwrap();
 	let drawing_area = backend.into_drawing_area();
@@ -184,26 +184,34 @@ fn KeyboardButton(
     let location = use_location().pathname;
     let on_click = move |_| {
 	
-	ui_state.update(|state| {
-	    state.mode=keyboard_state.get().keys[index].mode;
-	});
-	keyboard_state.update(|Keyboard{keys, ..}| {
-	    for (idx, key) in keys.iter_mut().enumerate() {
-		if idx == index {
-		    key.selected = key.selected.not();
-		} else {
-//		    key.selected = false;
-		}
-	    }
-	});
+
 
 	if location.get().as_str() == "/debug" {
-	    logging::log!("set adc num");
-	    spawn_local(async move {
-		let args = to_value(&MessageArgs{payload: KEYMAP[index].to_string().as_str()}).unwrap();
-		let msg = invoke("set_adc_num", args).await.as_string().unwrap();
-		logging::log!("{}", msg);
+	    //set monitor
+	    ui_state.update(|v| v.key_monitor=index as u32);
+	    keyboard_state.update(|Keyboard{keys, ..}| {
+		for (idx, key) in keys.iter_mut().enumerate() {
+		    if idx == index {
+			key.selected = key.selected.not();
+		    } else {
+			key.selected = false;
+		    }
+		}
 	    });
+	} else {
+	    ui_state.update(|state| {
+		state.mode=keyboard_state.get().keys[index].mode;
+	    });
+	    keyboard_state.update(|Keyboard{keys, ..}| {
+		for (idx, key) in keys.iter_mut().enumerate() {
+		    if idx == index {
+			key.selected = key.selected.not();
+		    } else {
+			//		    key.selected = false;
+		    }
+		}
+	    });
+
 	}
     };
 
@@ -341,6 +349,8 @@ pub fn Navbar(
     let uistate = use_context::<RwSignal<UiState>>().unwrap();
     let set_adc_datas = use_context::<WriteSignal<ADC_Data>>().unwrap();
 
+    let adc_vec = use_context::<RwSignal<Vec<u32>>>().unwrap();
+    let (dialog_switch, set_dialog_switch) = create_signal(false);
     // let title = move || match path_name.get().as_str(). {
     // 	"/performance" => "Performance",
     // 	"/keymap" => "KeyMap",
@@ -387,15 +397,25 @@ pub fn Navbar(
 		    let len = dataview.byte_length();
 		    let ba: Vec<u8> = (0..len).map(|i| { dataview.get_uint8(i+ofs) }).collect();
 		    if rid == 2 {
-//			logging::log!("{:?}", ba);
+			//			logging::log!("{:?}", ba);
 			let adc_data_page = ba[0] as usize;
+			let mut data: u32 = 0;
 			for (idx, x) in ba[1..17].iter().enumerate() {
-				if idx%2==1 {
-				    set_adc_datas.update(|v| v.array[STM2RS[idx/2 + adc_data_page*8]] += x.clone() as u32);
+			    if idx%2==1 {
+				data += x.clone() as u32;
+				set_adc_datas.update(|v| v.array[STM2RS[idx/2 + adc_data_page*8]] = data);
+				if uistate.get().key_monitor == STM2RS[idx/2 + adc_data_page*8] as u32 {
+				    adc_vec.update(|v| {
+					v.push(data);
+					if v.len() > 128 {
+					    v.remove(0);
+					}
+				    });
 				}
-				else {
-				    set_adc_datas.update(|v| v.array[STM2RS[idx/2 + adc_data_page*8]] = x.clone() as u32 *256);
-				}
+				
+			    } else {
+				data = x.clone() as u32 *256;
+			    }
 			}
 			
 		    }
@@ -438,6 +458,7 @@ pub fn Navbar(
 
 		    }
 		    logging::log!("Send Report");
+		    set_dialog_switch.set(true);
 		    //close device
 		    //		wasm_bindgen_futures::JsFuture::from(device.close()).await.expect("Error While Closing the Device");
 		}
@@ -466,8 +487,33 @@ pub fn Navbar(
 		    "Connect"
 		}
 	    }}</button>
+
+<div class="modal fade" class:show=move||dialog_switch.get() tabindex="-1" role="dialog" class:block=move||dialog_switch.get()>
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Dialog</h5>
+        <button type="button" class="close"  on:click=move|_|set_dialog_switch.set(false)>
+            <i class="material-icons">close</i>
+        </button>
+      </div>
+      <div class="modal-body">
+            "Successfully Send Settings"
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" on:click=move|_|set_dialog_switch.set(false) >Close</button>
+      </div>
+    </div>
+  </div>
+ </div>
 	    
             <button class="navbar-toggler collapsed" class:toggled=navbar_switch.0 type="button" on:click=move |_| {navbar_switch.1.update(|n| *n = n.not()) }>
+
+
+
+
+
+	    
             <span class="sr-only">Toggle navigation</span>
             <span class="navbar-toggler-icon icon-bar"></span>
             <span class="navbar-toggler-icon icon-bar"></span>

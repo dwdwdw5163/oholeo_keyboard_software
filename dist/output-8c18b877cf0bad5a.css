@@ -596,16 +596,16 @@ video {
   margin: 0px;
 }
 
+.mb-0 {
+  margin-bottom: 0px;
+}
+
 .ml-auto {
   margin-left: auto;
 }
 
-.mr-auto {
-  margin-right: auto;
-}
-
-.mb-0 {
-  margin-bottom: 0px;
+.block {
+  display: block;
 }
 
 .flex {

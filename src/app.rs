@@ -18,6 +18,7 @@ use crate::{component::*, keyboard::Keyboard};
 pub struct UiState {
     pub hid_device: Option<HidDevice>,
     pub mode: u32,
+    pub key_monitor: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -32,13 +33,16 @@ pub fn App() -> impl IntoView {
     let uistate = create_rw_signal(UiState{
 	hid_device: None,
 	mode: 0,
+	key_monitor: 0,
     });
     provide_context(uistate);
     provide_context(keyboard_state);
     let (adc_datas, set_adc_datas) = create_signal(ADC_Data{array: [0u32; 64], cnt: 0});
     provide_context(adc_datas);
     provide_context(set_adc_datas);
-	    
+    let chart_data = create_rw_signal(Vec::<u32>::new());
+    provide_context(chart_data);
+    
     let navbar_switch = create_signal(false);
 
 
