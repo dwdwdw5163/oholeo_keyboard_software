@@ -47,7 +47,7 @@ pub fn Analog_Chart() -> impl IntoView {
     let canvas_ref = create_node_ref::<html::Canvas>();
     create_effect(move |_| {
 	let adc_datas = event_vec.get();
-	let canvas = canvas_ref.get().unwrap();
+	let _canvas = canvas_ref.get().unwrap();
 	let backend = CanvasBackend::with_canvas_object(canvas_ref.get().as_deref().unwrap().to_owned()).unwrap();
 	let drawing_area = backend.into_drawing_area();
 	drawing_area.fill(&RGBAColor(255,255,255,1.0)).unwrap();
@@ -76,7 +76,7 @@ pub fn Analog_Chart() -> impl IntoView {
 
 	<div class="card card-chart">
         <div class="card-header card-chart card-header-warning text-center">
-	    <canvas id="canvas" style:width="100%" _ref=canvas_ref/>
+	  <canvas id="canvas" style:width="100%" _ref=canvas_ref/>
 
             </div>
 
@@ -387,10 +387,21 @@ pub fn Navbar(
 		//open device
 		wasm_bindgen_futures::JsFuture::from(device.open()).await.expect("Cannot Open Device");
 		//		let device: &HidDevice = device .dyn_ref::<HidDevice>().expect("FAILED to cast `JsValue` in array into `HidDevice`.");
+		let closure = Closure::<dyn FnMut(_)>::new(move |e: web_sys::HidConnectionEvent| {
+		    let event_dev = e.device();
+		    if let Some(dev) = uistate.get().hid_device {
+			if event_dev.product_name() == dev.product_name(){
+			    logging::log!("Disconnected");
+			    uistate.update(|v| v.hid_device=None)
+			}
+		    }
+		});
+		nav.hid().set_ondisconnect(Some(closure.as_ref().unchecked_ref()));
+		closure.forget();
+		
+		
 
-
-
-		let closure = Closure::wrap(Box::new(move |e: web_sys::HidInputReportEvent| {
+		let closure = Closure::<dyn FnMut(_)>::new(move |e: web_sys::HidInputReportEvent| {
 		    let dataview = e.data();
 		    let rid = e.report_id();
 		    let ofs = dataview.byte_offset();
@@ -419,7 +430,7 @@ pub fn Navbar(
 			}
 			
 		    }
-		}) as Box<dyn FnMut(web_sys::HidInputReportEvent)>);
+		});
 		device.set_oninputreport(Some(closure.as_ref().unchecked_ref()));
 		closure.forget();
 		
