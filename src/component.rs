@@ -33,6 +33,31 @@ pub const HEIGHT: u32 = 64;
 
 
 
+#[component]
+pub fn Profiles() -> impl IntoView {
+
+
+    view! {
+	<div class="card">
+	    <div class="card-header card-header-info">
+	    
+
+	    </div>
+
+	    <div class="card-body">
+
+
+	    </div>
+
+	    <div class="card-footer">
+
+
+	    </div>
+	    
+	</div>
+    }
+}
+
 
 #[component]
 pub fn Analog_Chart() -> impl IntoView {
@@ -124,11 +149,12 @@ fn Keycap_value(
 			    }.into_view()
 			},
 			1 => {
-			    view! {<p style:font-size="10px">{move || keyboard_state.get().keys[index].value.1}{" "}
-				   {move || keyboard_state.get().keys[index].value.2}{" "}
-				   {move || keyboard_state.get().keys[index].value.3}</p>
-				   //   <p style:font-size="10px" style:height="8px" style:margin="0 0">{move || keyboard_state.get().keys[index].value.1}</p>
-				   //   <p style:font-size="10px" style:height="8px" style:margin="0 0">{move || keyboard_state.get().keys[index].value.2}</p>
+			    view! {
+				<p style:font-size="10px">{move || keyboard_state.get().keys[index].value.1}{" "}
+				{move || keyboard_state.get().keys[index].value.2}{" "}
+				{move || keyboard_state.get().keys[index].value.3}</p>
+				//   <p style:font-size="10px" style:height="8px" style:margin="0 0">{move || keyboard_state.get().keys[index].value.1}</p>
+				//   <p style:font-size="10px" style:height="8px" style:margin="0 0">{move || keyboard_state.get().keys[index].value.2}</p>
 			    }.into_view()
 			}
 			_ => {view! {}.into_view()},
@@ -138,8 +164,14 @@ fn Keycap_value(
 		    view! {
 			<p>{move || adc_data.get()}</p>
 		    }.into_view()
+		} else if pathname.get().as_str() == "/keymap" {
+		    view! {
+			<p class="m-0"></p>
+		    }.into_view()
 		} else {
-		    view! {}.into_view()
+		    view! {
+			<p class="m-0"></p>
+		    }.into_view()
 		}
 	    }
 	}
@@ -184,8 +216,6 @@ fn KeyboardButton(
     let location = use_location().pathname;
     let on_click = move |_| {
 	
-
-
 	if location.get().as_str() == "/debug" {
 	    //set monitor
 	    ui_state.update(|v| v.key_monitor=index as u32);
@@ -254,30 +284,30 @@ fn KeyboardButton(
 	    <div class="card-body text-center" style:overflow="scroll" style:padding="0 0">
 	 <div style:min-width=move || format!("{}px", 15*WIDTH)>
 
-	 {(0..=13)
+	 <div>{(0..=13)
 	  .map(|idx|
 	       view! {<KeyboardButton index=idx/>}
-	  ).collect_view()}
-	 <br/>
-	 {(14..=27)
+	  ).collect_view()}</div>
+
+	 <div>{(14..=27)
 	  .map(|idx|
 	       view! {<KeyboardButton index=idx/>}
-	  ).collect_view()}
-	 <br/>
-	 {(28..=40)
+	  ).collect_view()}</div>
+
+	 <div>{(28..=40)
 	  .map(|idx|
 	       view! {<KeyboardButton index=idx/>}
-	  ).collect_view()}
-	 <br/>
-	 {(41..=54)
+	  ).collect_view()}</div>
+
+	 <div>{(41..=54)
 	  .map(|idx|
 	       view! {<KeyboardButton index=idx/>}
-	  ).collect_view()}
-	 <br/>
-	 {(55..=63)
+	  ).collect_view()}</div>
+
+	 <div>{(55..=63)
 	  .map(|idx|
 	       view! {<KeyboardButton index=idx/>}
-	  ).collect_view()}
+	  ).collect_view()}</div>
 
 	 </div>
 	     </div>
@@ -491,13 +521,15 @@ pub fn Navbar(
             <a class="navbar-brand" >{title}<div class="ripple-container"></div></a>
             </div>
 
-	    <button type="submit" class="btn ml-auto" class:btn-success=move||uistate.get().hid_device.is_some() on:click=upload>{move|| {
+	    <button type="submit" class="btn ml-auto overflow-hidden relative" class:btn-success=move||uistate.get().hid_device.is_some() on:click=upload>{move|| {
 		if uistate.get().hid_device.is_some() {
 		    "Save to Keyboard"
 		} else {
 		    "Connect"
 		}
-	    }}</button>
+
+	    }}
+	</button>
 
 <div class="modal fade" class:show=move||dialog_switch.get() tabindex="-1" role="dialog" class:block=move||dialog_switch.get()>
   <div class="modal-dialog" role="document">

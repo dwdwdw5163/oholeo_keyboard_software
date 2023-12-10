@@ -1,7 +1,11 @@
+use std::time::Duration;
+
 use leptos::*;
+use tauri_sys::window;
 use wasm_bindgen::prelude::*;
 use leptos_router::*;
-use web_sys::{Hid, HidDeviceRequestOptions, HidDevice};
+use web_sys::{Hid, HidDeviceRequestOptions, HidDevice, EventTarget};
+
 
 #[wasm_bindgen]
 extern "C" {
@@ -10,6 +14,47 @@ extern "C" {
 }
 
 
+#[wasm_bindgen]
+pub fn ripple_effect() -> Result<(), JsValue> {
+    let window = web_sys::window().unwrap();
+    let document = std::rc::Rc::new(window.document().expect("should have a Document"));
+
+
+
+    let doc = document.clone();
+    let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
+        let target = event.target().unwrap().dyn_into::<web_sys::Element>().unwrap();
+	logging::log!("{:?}",target.class_name());
+        if target.class_list().contains("btn") {
+	    let ripple = doc.clone().create_element("div").unwrap();
+	    ripple.set_class_name("ripple");
+	    let ripple_container = doc.clone().create_element("div").unwrap();
+	    ripple_container.set_class_name("ripple-container");
+	    ripple_container.append_child(&ripple).unwrap();
+	    
+            let style = format!("top: {}px; left: {}px", event.offset_y(), event.offset_x());
+            ripple.set_attribute("style", &style).unwrap();
+	    logging::log!("cnt: {:?} name: {:?}", target.child_element_count(), target.class_name());
+            target.append_child(&ripple_container).unwrap();
+	    set_timeout(move || {target.remove_child(&ripple_container).unwrap();}, Duration::from_secs(1));
+        }
+    }) as Box<dyn FnMut(_)>);
+
+    document.clone().add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())?;
+    closure.forget();
+
+//     let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
+//         let target = event.target().unwrap().dyn_into::<web_sys::Element>().unwrap();
+// 	logging::log!("{:?}", target.class_name());
+//         if target.class_name().as_str() == "ripple" {
+// //	    target.remove();
+//         }
+//     }) as Box<dyn FnMut(_)>);
+//     document.add_event_listener_with_callback("mouseup", closure.as_ref().unchecked_ref())?;
+//     closure.forget();
+    
+    Ok(())
+}
 
 use crate::{component::*, keyboard::Keyboard};
 
@@ -45,6 +90,9 @@ pub fn App() -> impl IntoView {
     
     let navbar_switch = create_signal(false);
 
+    ripple_effect().unwrap();
+
+
 
 
     view! {
@@ -75,7 +123,8 @@ pub fn App() -> impl IntoView {
 
 	    <Routes>
 	    <Route path="/performance" view=DashBoard/>
-	    <Route path="/user" view=|| view! {profiles view}/>
+	    <Route path="/keymap" view=Profiles/>
+	    <Route path="/rgb" view=|| view! {rgb view}/>
 	    <Route path="/debug" view=Analog_Chart/>
 	    </Routes>
 
