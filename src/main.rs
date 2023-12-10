@@ -1,6 +1,7 @@
 mod app;
 mod component;
 mod keyboard;
+mod bootstrap;
 
 use app::App;
 use leptos::*;

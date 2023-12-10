@@ -1,4 +1,9 @@
 (undo-tree-save-format-version . 1)
-"de2f955e09f975ff4767d5aa21fd33639de38abf"
-[nil current nil nil (25940 57488 555679 0) 0 nil]
+"068ec264c08aabf6f2e3230f4762ddb4a5e18fe7"
+[nil nil nil nil (25940 57488 555679 0) 0 nil]
+([nil nil ((38 . 39) (t 25918 30851 316088 265000)) nil (25973 35715 733975 0) 0 nil])
+([nil nil ((39 . 41)) nil (25973 35715 733973 0) 0 nil])
+([nil nil ((apply yas--snippet-revive 39 43 #s(yas--snippet nil nil #s(yas--exit 43 nil) 316 nil nil nil nil)) (apply yas--take-care-of-redo #s(yas--snippet nil nil #s(yas--exit 43 nil) 316 nil nil nil nil)) (39 . 43) (#("mod $0" 0 6 (fontified nil)) . 39) (39 . 45) (#("mo" 0 2 (fontified nil)) . 39) (39 . 41) (#("mod" 0 3 (fontified nil)) . -39) (39 . 42) (#("mo" 0 2 (fontified t)) . -39) (undo-tree-id5 . -2) (undo-tree-id6 . -1) (undo-tree-id7 . -1) (undo-tree-id8 . -2) (undo-tree-id9 . -2) 41) nil (25973 35715 733971 0) 0 nil])
+([nil nil ((43 . 44)) nil (25973 35715 733963 0) 0 nil])
+([nil current ((43 . 53) (#("b" 0 1 (fontified nil)) . 43) (43 . 44) (#("bootstrap;" 0 10 (fontified nil)) . -43) (43 . 53) (#("b" 0 1 (face font-lock-constant-face fontified t)) . -43) (undo-tree-id0 . -1) (undo-tree-id1 . -1) (undo-tree-id2 . -1) (undo-tree-id3 . -1) (undo-tree-id4 . -1) 44) nil (25973 35715 733958 0) 0 nil])
 nil

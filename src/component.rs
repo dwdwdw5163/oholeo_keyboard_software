@@ -10,7 +10,7 @@ use futures::StreamExt;
 use web_sys::HidDevice;
 
 
-use crate::{keyboard::{Keyboard, KEYBOARD_CHARS, KEYMAP, MessageArgs, STM2RS}, app::{UiState, ADC_Data}};
+use crate::{keyboard::{Keyboard, KEYBOARD_CHARS, KEYMAP, MessageArgs, STM2RS}, app::{UiState, ADC_Data}, bootstrap::get_modal_by_id};
 
 #[wasm_bindgen]
 extern "C" {
@@ -612,55 +612,67 @@ pub fn KeySettings() -> impl IntoView {
     
     let update_activation_value =  move |ev| {
         let v = event_target_value(&ev);
-	let number = selected_num.get();
-        activation_value.1.set(v.clone());
-	keyboard_state.update(|Keyboard{keys, ..}| {
-	    for key in keys.iter_mut() {
-		if key.selected || number==0 {
-		    key.value.0 = v.parse::<u32>().unwrap();
+	let value = v.parse::<u32>().unwrap();
+	if value>0 && value<=100 {
+	    let number = selected_num.get();
+            activation_value.1.set(v.clone());
+	    keyboard_state.update(|Keyboard{keys, ..}| {
+		for key in keys.iter_mut() {
+		    if key.selected || number==0 {
+			key.value.0 = v.parse::<u32>().unwrap();
+		    }
 		}
-	    }
-	});
+	    });
+	}
     };
 
     let update_trigger_value =  move |ev| {
         let v = event_target_value(&ev);
-	let number = selected_num.get();
-        trigger_value.1.set(v.clone());
-	keyboard_state.update(|Keyboard{keys, ..}| {
-	    for key in keys.iter_mut() {
-		if key.selected || number==0 {
-		    key.value.1 = v.parse::<u32>().unwrap();
+	let value = v.parse::<u32>().unwrap();
+	if value>0 && value<=100 {
+	    let number = selected_num.get();
+            trigger_value.1.set(v.clone());
+	    keyboard_state.update(|Keyboard{keys, ..}| {
+		for key in keys.iter_mut() {
+		    if key.selected || number==0 {
+			key.value.1 = v.parse::<u32>().unwrap();
+		    }
 		}
-	    }
-	});
+	    });
+	}
     };
 
     
     let update_reset_value =  move |ev| {
-        let v = event_target_value(&ev);
-	let number = selected_num.get();
-        reset_value.1.set(v.clone());
-	keyboard_state.update(|Keyboard{keys, ..}| {
-	    for key in keys.iter_mut() {
-		if key.selected || number==0{
-		    key.value.2 = v.parse::<u32>().unwrap();
+        let v = event_target_value(&ev);	
+	let value = v.parse::<u32>().unwrap();
+	if value>0 && value<=100 {
+	    let number = selected_num.get();
+            reset_value.1.set(v.clone());
+	    keyboard_state.update(|Keyboard{keys, ..}| {
+		for key in keys.iter_mut() {
+		    if key.selected || number==0{
+			key.value.2 = v.parse::<u32>().unwrap();
+		    }
 		}
-	    }
-	});
+	    });
+	}
     };
 
     let update_lower_deadzone =  move |ev| {
         let v = event_target_value(&ev);
-	let number = selected_num.get();
-        lower_deadzone.1.set(v.clone());
-	keyboard_state.update(|Keyboard{keys, ..}| {
-	    for key in keys.iter_mut() {
-		if key.selected || number==0{
-		    key.value.3 = v.parse::<u32>().unwrap();
+	let value = v.parse::<u32>().unwrap();
+	if value>0 && value<=100 {
+	    let number = selected_num.get();
+            lower_deadzone.1.set(v.clone());
+	    keyboard_state.update(|Keyboard{keys, ..}| {
+		for key in keys.iter_mut() {
+		    if key.selected || number==0{
+			key.value.3 = v.parse::<u32>().unwrap();
+		    }
 		}
-	    }
-	});
+	    });
+	}
     };
 
     let update_mode = move |ev| {
@@ -722,25 +734,25 @@ pub fn KeySettings() -> impl IntoView {
 		<h5>"Activation Point"</h5>
 		    <div class="form-row" style="justify-content:space-around; align-items:center;">
 		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange0" prop:value=move||activation_value.0.get() on:input=update_activation_value/></span>
-		    <input type="number" class="form-control" style:width="10%" prop:value=move||activation_value.0.get() on:input=update_activation_value/>
+		    <input type="number" class="form-control" min="1" max="100" style:width="10%" prop:value=move||activation_value.0.get() on:change=update_activation_value/>
 		    </div>
 	    }.into_view(),
 	    "1" => view! {
 		<h5>"Dynamic Trigger Travel"</h5>
 		    <div class="form-row" style="justify-content:space-around; align-items:center;">
 		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange1" prop:value=move||trigger_value.0.get() on:input=update_trigger_value/></span>
-		    <input type="number" class="form-control" style:width="10%" prop:value=move||trigger_value.0.get() on:input=update_trigger_value/>
+		    <input type="number" class="form-control" min="1" max="100" style:width="10%" prop:value=move||trigger_value.0.get() on:change=update_trigger_value/>
 		    </div>
 		    
 		    <h5>"Dynamic Reset Travel"</h5>
 		    <div class="form-row" style="justify-content:space-around; align-items:center;">
 		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange2" prop:value=move||reset_value.0.get() on:input=update_reset_value/></span>
-		    <input type="number" class="form-control" style:width="10%" prop:value=move||reset_value.0.get() on:input=update_reset_value/>
+		    <input type="number" class="form-control" min="1" max="100" style:width="10%" prop:value=move||reset_value.0.get() on:change=update_reset_value/>
 		    </div>
 		    <h5>"Lower DeadZone"</h5>
 		    <div class="form-row" style="justify-content:space-around; align-items:center;">
 		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange3" prop:value=move||lower_deadzone.0.get() on:input=update_lower_deadzone/></span>
-		    <input type="number" class="form-control" style:width="10%" prop:value=move||lower_deadzone.0.get() on:input=update_lower_deadzone/>
+		    <input type="number" class="form-control" min="1" max="100" style:width="10%" prop:value=move||lower_deadzone.0.get() on:change=update_lower_deadzone/>
 		    
 		    </div>
 	    }.into_view(),
