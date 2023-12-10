@@ -632,6 +632,10 @@ video {
   border-width: 1px;
 }
 
+.p-0 {
+  padding: 0px;
+}
+
 .text-center {
   text-align: center;
 }

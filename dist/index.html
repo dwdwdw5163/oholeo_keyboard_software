@@ -11,7 +11,7 @@
 
     
     <script type="module">import init from '/tauri-app-ui-10765a1b27bc0501.js';init('/tauri-app-ui-10765a1b27bc0501_bg.wasm');</script>
-    <link rel="stylesheet" href="/output-27d443f32acefe91.css">
+    <link rel="stylesheet" href="/output-2fcdbf47937b71a2.css">
     
 
 
@@ -52,7 +52,7 @@
 	  text-align: center;
 	  text-decoration: none;
 	  font-size: 16px;
-
+	  vertical-align: top;
       }
       
       .keybutton {
@@ -133,4 +133,31 @@
 	
   
 
-</body></html>
+<script>(function () {
+    var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var url = protocol + '//' + window.location.host + '/_trunk/ws';
+    var poll_interval = 5000;
+    var reload_upon_connect = () => {
+        window.setTimeout(
+            () => {
+                // when we successfully reconnect, we'll force a
+                // reload (since we presumably lost connection to
+                // trunk due to it being killed, so it will have
+                // rebuilt on restart)
+                var ws = new WebSocket(url);
+                ws.onopen = () => window.location.reload();
+                ws.onclose = reload_upon_connect;
+            },
+            poll_interval);
+    };
+
+    var ws = new WebSocket(url);
+    ws.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data);
+        if (msg.reload) {
+            window.location.reload();
+        }
+    };
+    ws.onclose = reload_upon_connect;
+})()
+</script></body></html>
