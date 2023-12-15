@@ -725,9 +725,7 @@ pub fn Navbar(
 	    }}
 	</button>
 
-	    <div class="modal fade" class:show=move||dialog_switch.get() tabindex="-1" role="dialog"
-	    style:display=move||{if dialog_switch.get() {"block"}else{"none"}}
-	    >
+<div class="modal fade" class:show=move||dialog_switch.get() tabindex="-1" role="dialog" class:block=move||dialog_switch.get()>
   <div class="modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">

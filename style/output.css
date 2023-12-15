@@ -604,16 +604,8 @@ video {
   margin: 0px;
 }
 
-.m-3 {
-  margin: 0.75rem;
-}
-
 .m-px {
   margin: 1px;
-}
-
-.m-2 {
-  margin: 0.5rem;
 }
 
 .mb-0 {
@@ -624,16 +616,12 @@ video {
   margin-left: auto;
 }
 
+.block {
+  display: block;
+}
+
 .flex {
   display: flex;
-}
-
-.h-12 {
-  height: 3rem;
-}
-
-.min-w-full {
-  min-width: 100%;
 }
 
 .transform {
@@ -666,6 +654,11 @@ video {
 
 .text-center {
   text-align: center;
+}
+
+.text-xs {
+  font-size: 0.75rem;
+  line-height: 1rem;
 }
 
 .outline {
