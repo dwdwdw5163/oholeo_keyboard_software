@@ -24,8 +24,8 @@ pub fn ripple_effect() -> Result<(), JsValue> {
     let doc = document.clone();
     let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
         let target = event.target().unwrap().dyn_into::<web_sys::Element>().unwrap();
-	logging::log!("{:?}",target.class_name());
-        if target.class_list().contains("btn") {
+//	logging::log!("{:?}",target.class_name());
+        if target.class_list().contains("btn") || target.class_list().contains("ripple-effect") {
 	    let ripple = doc.clone().create_element("div").unwrap();
 	    ripple.set_class_name("ripple");
 	    let ripple_container = doc.clone().create_element("div").unwrap();
@@ -34,7 +34,7 @@ pub fn ripple_effect() -> Result<(), JsValue> {
 	    
             let style = format!("top: {}px; left: {}px", event.offset_y(), event.offset_x());
             ripple.set_attribute("style", &style).unwrap();
-	    logging::log!("cnt: {:?} name: {:?}", target.child_element_count(), target.class_name());
+//	    logging::log!("cnt: {:?} name: {:?}", target.child_element_count(), target.class_name());
             target.append_child(&ripple_container).unwrap();
 	    set_timeout(move || {target.remove_child(&ripple_container).unwrap();}, Duration::from_secs(1));
         }
@@ -56,7 +56,7 @@ pub fn ripple_effect() -> Result<(), JsValue> {
     Ok(())
 }
 
-use crate::{component::*, keyboard::Keyboard};
+use crate::{component::*, keyboard::{Keyboard, KeyCode}};
 
 
 #[derive(Debug, Clone)]
@@ -93,8 +93,6 @@ pub fn App() -> impl IntoView {
     ripple_effect().unwrap();
 
 
-
-
     view! {
 	
 	<Router>
@@ -124,7 +122,7 @@ pub fn App() -> impl IntoView {
 	    <Routes>
 	    <Route path="/performance" view=DashBoard/>
 	    <Route path="/keymap" view=Profiles/>
-	    <Route path="/rgb" view=|| view! {rgb view}/>
+	    <Route path="/rgb" view=Rgb/>
 	    <Route path="/debug" view=Analog_Chart/>
 	    </Routes>
 

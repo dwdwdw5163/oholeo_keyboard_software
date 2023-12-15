@@ -1,16 +1,17 @@
-use std::ops::Not;
+use std::{ops::Not, str::FromStr};
 use leptos::*;
 use leptos_router::*;
-use plotters::coord::ranged1d::NoDefaultFormatting;
+use plotters::{coord::ranged1d::NoDefaultFormatting, prelude::Ranged};
 use serde_wasm_bindgen::to_value;
+use strum::{VariantNames, IntoEnumIterator};
 use wasm_bindgen::prelude::*;
 use tauri_sys::{event, tauri};
 use serde::Deserialize;
 use futures::StreamExt;
-use web_sys::HidDevice;
+use web_sys::{HidDevice, DragEvent};
 
 
-use crate::{keyboard::{Keyboard, KEYBOARD_CHARS, KEYMAP, MessageArgs, STM2RS}, app::{UiState, ADC_Data}, bootstrap::get_modal_by_id};
+use crate::{keyboard::{Keyboard, KEYBOARD_CHARS, KEYMAP, MessageArgs, STM2RS, KeyCode, RGB_GLOBAL_MODE, RGB_MODE}, app::{UiState, ADC_Data}, bootstrap::get_modal_by_id};
 
 #[wasm_bindgen]
 extern "C" {
@@ -31,22 +32,165 @@ struct Payload {
 pub const WIDTH: u32 = 64;
 pub const HEIGHT: u32 = 64;
 
-
-
 #[component]
-pub fn Profiles() -> impl IntoView {
+pub fn Rgb() -> impl IntoView {
+    use hex;
+    let keyboard_state = use_context::<RwSignal<Keyboard>>().unwrap();
+    let selected_num = create_memo(move |_| keyboard_state.get().keys.iter().filter(|key| key.selected).count());
 
+    let on_color_change = move |e: ev::Event| {
+	e.prevent_default();
+	let v = event_target_value(&e);
+	logging::log!("color: {:?}", v);
+	let color = hex::decode(&v[1..]).unwrap_or(vec![255,255,255]);
+	let number = selected_num.get();
+	logging::log!("color: {:?}", color);
+	keyboard_state.update(|Keyboard{keys, ..}| {
+	    for key in keys.iter_mut() {
+		if key.selected || number==0 {
+		    key.rgb_raw = key.rgb_raw & 0xff000000;
+		    key.rgb_raw = key.rgb_raw | ((color[0] as u32)<<16);
+		    key.rgb_raw = key.rgb_raw | ((color[1] as u32)<<8);
+		    key.rgb_raw = key.rgb_raw | ((color[2] as u32)<<0);
+		}
+	    }
+	});
+    };
+    
+    let on_gm_change = move |e: ev::Event| {
+	e.prevent_default();
+	let v = event_target_value(&e);
+	logging::log!("gm: {:?}", v);
+	let global_mode = RGB_GLOBAL_MODE::from_str(&v).unwrap_or(RGB_GLOBAL_MODE::RGB_GLOBAL_MODE_INDIVIDUAL) as u32;
+	logging::log!("gm: {}", global_mode);
+	let number = selected_num.get();
+	keyboard_state.update(|Keyboard{keys, ..}| {
+	    for key in keys.iter_mut() {
+		if key.selected || number==0 {
+		    key.rgb_raw = key.rgb_raw & 0x0fffffff;
+		    key.rgb_raw = key.rgb_raw | (global_mode<<28)
+		}
+	    }
+	});
+    };
+
+    let on_mode_change = move |e: ev::Event| {
+	e.prevent_default();
+	let v = event_target_value(&e);
+	logging::log!("mode: {:?}", v);
+	let mode = RGB_MODE::from_str(&v).unwrap_or(RGB_MODE::RGB_MODE_REACT_LINEAR) as u32;
+	logging::log!("mode: {}", mode);
+	let number = selected_num.get();
+	keyboard_state.update(|Keyboard{keys, ..}| {
+	    for key in keys.iter_mut() {
+		if key.selected || number==0 {
+		    key.rgb_raw = key.rgb_raw & 0xf0ffffff;
+		    key.rgb_raw = key.rgb_raw | (mode<<24)
+		}
+	    }
+	});
+    };
+    
+    
 
     view! {
 	<div class="card">
 	    <div class="card-header card-header-info">
+	      <h5>RGB Settings</h5>
 	    
+
+	    </div>
+	    <div class="card-body">
+
+	    <form>
+	    <div class="form-group">
+	    <label for="color">Color</label>
+	    <input id="color" type="color" on:change=on_color_change/>
+	    </div>
+	    
+	    <div class="form-group">
+	    <label for="global-mode">Global Mode</label>
+	    <select id="global-mode" class="form-control" on:change=on_gm_change>
+	{RGB_GLOBAL_MODE::iter().map(|gm| view! {<option>{gm.to_string()}</option>} ).collect_view()}
+	    </select>
+	    </div>
+
+	    <div class="form-group">
+	    <label for="mode">Mode</label>
+	    <select id="mode" class="form-control" on:change=on_mode_change>
+	{RGB_MODE::iter().map(|m| view! {<option>{m.to_string()}</option>} ).collect_view()}
+	    </select>
+	    </div>
+
+	 
+	    
+
+	    </form>
+
+	    </div>
+	    <div class="card-footer">
+
+
+
+	    </div>
+	</div>
+
+    }
+}
+
+#[component]
+pub fn Profiles() -> impl IntoView {
+    use strum::IntoEnumIterator;
+    use strum::VariantNames;
+
+    let on_dragstart = move |event: ev::DragEvent| {
+	let data_transfer = event.data_transfer().unwrap();
+	data_transfer.set_data("keycode", "test").unwrap();
+    };
+    let on_dragend = move |event: ev::DragEvent| {
+	let data_transfer = event.data_transfer().unwrap();
+	data_transfer.clear_data().unwrap();
+    };
+    
+    view! {
+	<div class="card">
+	    <div class="card-header card-header-info">
+	    
+	    <ul class="nav nav-tabs">
+	    <li class="nav-item">
+            <a class="nav-link ripple-effect" href="">Basic</a>
+	    </li>
+	    <li class="nav-item">
+            <a class="nav-link ripple-effect" href="">System</a>
+	    </li>
+	    <li class="nav-item">
+            <a class="nav-link ripple-effect" href="">Joystick</a>
+	    </li>
+	    </ul>
 
 	    </div>
 
 	    <div class="card-body">
-
-
+	
+	    <div class="overflow-scroll" style:height="300px">{
+		KeyCode::iter().enumerate().map(|(idx, code)| view! {
+		    <div class="keycap-border" style="min-width:64px; height:64px">
+			<div class="keybutton m-px p-3"
+			on:dragstart=move|event: ev::DragEvent|{
+			    let data_transfer = event.data_transfer().unwrap();
+			    data_transfer.set_data("keycode", idx.to_string().as_str()).unwrap();
+			}
+			on:dragend=on_dragend
+			draggable="true">
+		        {code.to_string()}
+			</div>
+		    </div>
+		    
+		}).collect_view()
+	    }</div>
+	
+	    
+	    
 	    </div>
 
 	    <div class="card-footer">
@@ -134,15 +278,21 @@ fn Keycap_value(
     // create_effect(move |_| {
 	
     // });
+    let bind_keys = create_memo(move |_| {
+	let index = keyboard_state.get().keys[index].bind_key;	
+	let keycode = KeyCode::iter().enumerate().find(|(idx, _code)| index==*idx).unwrap_or((0,KeyCode::RESERVED)).1;
+	keycode.to_string()
+    });
     
     view! {
-	<p class="m-0" style:font-weight="bold" style:font-size="20px">{move || KEYBOARD_CHARS[keyboard_state.get().keys[index].bind_key as usize]}</p>
+
 	{
 	    move || {
 		if pathname.get().as_str() == "/performance" {
 		    match keyboard_state.get().keys[index].mode {
 			0 => {
 			    view! {
+				<p class="m-0" style:font-weight="bold" style:font-size="20px">{move || KEYBOARD_CHARS[keyboard_state.get().keys[index].index as usize]}</p>
 				<p class="mb-0" style:font-size="12px">{move || keyboard_state.get().keys[index].value.0}</p>
 				//	<p style:font-size="10px" style:height="8px" style:margin="0 0">{move || keyboard_state.get().keys[index].value.0}</p>
 				//	<p style:font-size="10px" style:height="8px" style:margin="auto">" "</p>
@@ -150,6 +300,7 @@ fn Keycap_value(
 			},
 			1 => {
 			    view! {
+				<p class="m-0" style:font-weight="bold" style:font-size="20px">{move || KEYBOARD_CHARS[keyboard_state.get().keys[index].index as usize]}</p>
 				<p style:font-size="10px">{move || keyboard_state.get().keys[index].value.1}{" "}
 				{move || keyboard_state.get().keys[index].value.2}{" "}
 				{move || keyboard_state.get().keys[index].value.3}</p>
@@ -162,47 +313,22 @@ fn Keycap_value(
 		    }
 		} else if pathname.get().as_str() == "/debug" {
 		    view! {
+			<p class="m-0" style:font-weight="bold" style:font-size="20px">{move || KEYBOARD_CHARS[keyboard_state.get().keys[index].index as usize]}</p>
 			<p>{move || adc_data.get()}</p>
 		    }.into_view()
 		} else if pathname.get().as_str() == "/keymap" {
 		    view! {
-			<p class="m-0"></p>
+			<p class="m-0 p-1.5" style:font-size="12px">{bind_keys}</p>
 		    }.into_view()
 		} else {
 		    view! {
+			<p class="m-0" style:font-weight="bold" style:font-size="20px">{move || KEYBOARD_CHARS[keyboard_state.get().keys[index].index as usize]}</p>
 			<p class="m-0"></p>
 		    }.into_view()
 		}
 	    }
 	}
     }
-
-    
-    // view! {
-    // 	{
-    // 	    move || {
-    // 		if pathname.get().as_str() == "/performance" {
-    // 		    match keyboard_state.get().keys[index].mode {
-    // 			0 => {
-    // 			    view! {
-    // 				<p class="text-xs">"[Default]"</p>
-    // 				//	<p style:font-size="10px" style:height="8px" style:margin="0 0">{move || keyboard_state.get().keys[index].value.0}</p>
-    // 				//	<p style:font-size="10px" style:height="8px" style:margin="auto">" "</p>
-    // 			    }.into_view()
-    // 			},
-    // 			1 => {
-    // 			    view! {<p class="text-xs">"[RT]"</p>
-    // 				   //   <p style:font-size="10px" style:height="8px" style:margin="0 0">{move || keyboard_state.get().keys[index].value.1}</p>
-    // 				   //   <p style:font-size="10px" style:height="8px" style:margin="0 0">{move || keyboard_state.get().keys[index].value.2}</p>
-    // 			    }.into_view()
-    // 			}
-    // 			_ => {view! {}.into_view()},
-			
-    // 		    }
-    // 		}
-    // 	    }
-    // 	}
-    // }
 }
 
 
@@ -212,6 +338,8 @@ fn KeyboardButton(
 ) -> impl IntoView {
     let keyboard_state = use_context::<RwSignal<Keyboard>>().unwrap();
     let ui_state = use_context::<RwSignal<UiState>>().unwrap();
+
+    let select = move || keyboard_state.get().keys[index].selected;
     
     let location = use_location().pathname;
     let on_click = move |_| {
@@ -245,22 +373,71 @@ fn KeyboardButton(
 	}
     };
 
+    let on_dragenter = move |event: ev::DragEvent| {
+	event.prevent_default();
+	keyboard_state.update(|Keyboard{keys, ..}| {
+	    keys[index].selected = true;
+	});
+	logging::log!("dragenter index {}",index);
+    };
+
+    let on_dragleave = move |event: ev::DragEvent| {
+	event.prevent_default();
+	keyboard_state.update(|Keyboard{keys, ..}| {
+	    keys[index].selected = false;
+	});
+	logging::log!("dragleave index {}",index);
+   };
+    
+    let on_dragover = move |event: ev::DragEvent| {
+	event.prevent_default();
+//	logging::log!("dragover index {}", index);
+    };
+
+    let on_drop = move |event: ev::DragEvent| {
+	let data_transfer = event.data_transfer().unwrap();
+	let index = data_transfer
+	    .get_data("keycode").unwrap()
+	    .parse::<usize>().unwrap();
+	let keycode = KeyCode::iter().enumerate().find(|(idx, _code)| index==*idx).unwrap_or((0,KeyCode::RESERVED)).1 as i32;
+	logging::log!("drop index {}, data {:?}, keycode {}",
+		      index,
+		      KeyCode::VARIANTS[index],
+		      keycode);
+	keyboard_state.update(|Keyboard{keys, ..}| {
+	    for key in keys.iter_mut() {
+		if key.selected {
+		    key.selected = false;
+		    key.bind_key = index;
+		}
+	    }
+	});
+    };
+    
     view! {
 	<div
 	    class="keycap-border"
-	    	    //style:position="relative"
+
 	    style:width=move || format!("{}px", keyboard_state.get().keys[index].size.0)
 	    style:height=move || format!("{}px", keyboard_state.get().keys[index].size.1)>
 
 
 	    <div class="keybutton"
+	    droppable="true"
+	    on:dragover=on_dragover
+	    on:drop=on_drop
+	    on:dragenter=on_dragenter
+	    on:dragleave=on_dragleave
 	    style:position="relative"
 	    style:width="100%"
 	    style:top="0px"
 	    on:click=on_click
+	    
 	    class:active=move || keyboard_state.get().keys[index].selected>
 
+	    <div class="pointer-events-none">
 	    <Keycap_value index/>
+	    </div>
 	    // <p style:font-weight="bold" style:height="24px" style:margin="0 0">{move || KEYBOARD_CHARS[keyboard_state.get().keys[index].bind_key as usize]}</p>
 	    
 	    // <div><Keycap_value index/></div>
@@ -477,15 +654,32 @@ pub fn Navbar(
 
 		    let mut send_buf = [0u8; 64];
 		    for (page_num, keys) in keyboard_state.get().keys.chunks(4).enumerate() {
-			send_buf[0] = 2;
-			send_buf[1] = page_num as u8;
-			for i in 0..4 {
- 			    send_buf[2 + i*4+0] = keys[i].value.0 as u8 | ((keys[i].mode << 7) as u8);
-			    send_buf[2 + i*4+1] = keys[i].value.1 as u8;
-			    send_buf[2 + i*4+2] = keys[i].value.2 as u8;
-			    send_buf[2 + i*4+3] = keys[i].value.3 as u8;
+			match path_name.get().as_str() {
+			    "/performance" => {
+				send_buf[0] = 2;
+				send_buf[1] = page_num as u8;
+				for i in 0..4 {
+ 				    send_buf[2 + i*4+0] = keys[i].value.0 as u8 | ((keys[i].mode << 7) as u8);
+				    send_buf[2 + i*4+1] = keys[i].value.1 as u8;
+				    send_buf[2 + i*4+2] = keys[i].value.2 as u8;
+				    send_buf[2 + i*4+3] = keys[i].value.3 as u8;
+				}
+			    },
+			    "/rgb" => {
+				send_buf[0] = 2;
+				send_buf[1] = page_num as u8 + 16;
+				for i in 0..4 {
+				    let rgb_raw = keys[i].rgb_raw;
+ 				    send_buf[2 + i*4+0] = (rgb_raw>>24) as u8;
+				    send_buf[2 + i*4+1] = (rgb_raw>>16) as u8;
+				    send_buf[2 + i*4+2] = (rgb_raw>>8) as u8;
+				    send_buf[2 + i*4+3] = (rgb_raw>>0) as u8;
+				}
+			    },
+			    "/keymap" => {},
+			    _ => {},
 			}
-			//logging::log!("test: [page: {} payload: {:?}]", page_num, &send_buf[0..18]);
+			logging::log!("test: [page: {} payload: {:?}]", page_num, &send_buf[0..18]);
 			if device.opened() {
 			    let res = wasm_bindgen_futures::JsFuture::from(device.send_report_with_u8_array(2, &mut send_buf[1..18])).await;
 			    match res {

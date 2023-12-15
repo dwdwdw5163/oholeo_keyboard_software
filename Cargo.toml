@@ -21,10 +21,12 @@ tauri-sys = { git = "https://github.com/JonasKruckenberg/tauri-sys", features = 
 futures = "0.3.29"
 
 
-web-sys = { version = "0.3.66", features = ["HtmlCanvasElement", "Hid", "Navigator", "HidDevice", "HidDeviceRequestOptions", "HidInputReportEvent", "HidConnectionEvent", "EventTarget", "MouseEvent", "Document", "Element"] }
+web-sys = { version = "0.3.66", features = ["HtmlCanvasElement", "Hid", "Navigator", "HidDevice", "HidDeviceRequestOptions", "HidInputReportEvent", "HidConnectionEvent", "EventTarget", "MouseEvent", "Document", "Element", "DragEvent", "DataTransfer"] }
 
 plotters = "0.3.5"
 plotters-canvas = "0.3.0"
+strum = { version = "0.25.0", features = ["derive"] }
+hex = "0.4.3"
 
 [workspace]
 members = ["src-tauri"]
