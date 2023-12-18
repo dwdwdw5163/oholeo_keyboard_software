@@ -11,7 +11,7 @@ use futures::StreamExt;
 use web_sys::{HidDevice, DragEvent};
 
 
-use crate::{keyboard::{Keyboard, KEYBOARD_CHARS, KEYMAP, MessageArgs, STM2RS, KeyCode, RGB_GLOBAL_MODE, RGB_MODE}, app::{UiState, ADC_Data}, bootstrap::get_modal_by_id};
+use crate::{keyboard::*, app::{UiState, ADC_Data}};
 
 #[wasm_bindgen]
 extern "C" {
@@ -25,10 +25,6 @@ struct Payload {
   message: String,
 }
 
-
-
-
-
 pub const WIDTH: u32 = 64;
 pub const HEIGHT: u32 = 64;
 
@@ -38,6 +34,7 @@ pub fn Rgb() -> impl IntoView {
     let keyboard_state = use_context::<RwSignal<Keyboard>>().unwrap();
     let selected_num = create_memo(move |_| keyboard_state.get().keys.iter().filter(|key| key.selected).count());
 
+    
     let on_color_change = move |e: ev::Event| {
 	e.prevent_default();
 	let v = event_target_value(&e);
@@ -63,13 +60,11 @@ pub fn Rgb() -> impl IntoView {
 	logging::log!("gm: {:?}", v);
 	let global_mode = RGB_GLOBAL_MODE::from_str(&v).unwrap_or(RGB_GLOBAL_MODE::RGB_GLOBAL_MODE_INDIVIDUAL) as u32;
 	logging::log!("gm: {}", global_mode);
-	let number = selected_num.get();
+
 	keyboard_state.update(|Keyboard{keys, ..}| {
 	    for key in keys.iter_mut() {
-		if key.selected || number==0 {
 		    key.rgb_raw = key.rgb_raw & 0x0fffffff;
 		    key.rgb_raw = key.rgb_raw | (global_mode<<28)
-		}
 	    }
 	});
     };
@@ -78,7 +73,7 @@ pub fn Rgb() -> impl IntoView {
 	e.prevent_default();
 	let v = event_target_value(&e);
 	logging::log!("mode: {:?}", v);
-	let mode = RGB_MODE::from_str(&v).unwrap_or(RGB_MODE::RGB_MODE_REACT_LINEAR) as u32;
+	let mode = RGB_MODE::from_str(&v).unwrap_or(RGB_MODE::STATIC) as u32;
 	logging::log!("mode: {}", mode);
 	let number = selected_num.get();
 	keyboard_state.update(|Keyboard{keys, ..}| {
@@ -141,7 +136,7 @@ pub fn Rgb() -> impl IntoView {
 #[component]
 pub fn Profiles() -> impl IntoView {
     use strum::IntoEnumIterator;
-    use strum::VariantNames;
+
 
     let on_dragstart = move |event: ev::DragEvent| {
 	let data_transfer = event.data_transfer().unwrap();
@@ -270,6 +265,7 @@ fn Keycap_value(
     index: usize,
 ) -> impl IntoView{
     let keyboard_state = use_context::<RwSignal<Keyboard>>().unwrap();
+    let ui_state = use_context::<RwSignal<UiState>>().unwrap();
     let pathname = use_location().pathname;
     let adc_datas = use_context::<ReadSignal<ADC_Data>>().unwrap();
     let adc_data = create_memo(move |_| adc_datas.get().array[index]);
@@ -279,9 +275,27 @@ fn Keycap_value(
 	
     // });
     let bind_keys = create_memo(move |_| {
-	let index = keyboard_state.get().keys[index].bind_key;	
-	let keycode = KeyCode::iter().enumerate().find(|(idx, _code)| index==*idx).unwrap_or((0,KeyCode::RESERVED)).1;
+	use std::convert::TryFrom;
+	let keycode: i16 = match ui_state.get().layer {
+	    0 => keyboard_state.get().keys[index].bind_key.0,
+	    1 => keyboard_state.get().keys[index].bind_key.1,
+	    _ => KeyCode::RESERVED as i16,
+
+	};
+	let keycode = KeyCode::try_from(keycode).unwrap_or(KeyCode::ERROR_UNDEFINED);
 	keycode.to_string()
+    });
+
+    let rgb_mode = create_memo(move |_| {
+	use strum::VariantNames;
+	let rgb_raw = keyboard_state.get().keys[index].rgb_raw;
+	let mode = (rgb_raw >> 24) & 0x0f;
+	RGB_MODE::VARIANTS[mode as usize].to_string()
+    });
+
+    let rgb_color = create_memo(move |_| {
+	let color = keyboard_state.get().keys[index].rgb_raw & 0x00ffffff;
+	format!("#{:06X}", color)
     });
     
     view! {
@@ -318,7 +332,12 @@ fn Keycap_value(
 		    }.into_view()
 		} else if pathname.get().as_str() == "/keymap" {
 		    view! {
-			<p class="m-0 p-1.5" style:font-size="12px">{bind_keys}</p>
+			<p class="m-0 p-1.5" style:font-weight="bold" style:font-size="12px">{bind_keys}</p>
+		    }.into_view()
+		} else if pathname.get().as_str() == "/rgb" { 
+		    view! {
+			<p style:font-weight="bold" style:font-size="12px">{move||rgb_mode.get()}</p>
+			    <p style:background-color=move||rgb_color.get() style:color=move||rgb_color.get()>"COLOR"</p>
 		    }.into_view()
 		} else {
 		    view! {
@@ -399,7 +418,7 @@ fn KeyboardButton(
 	let index = data_transfer
 	    .get_data("keycode").unwrap()
 	    .parse::<usize>().unwrap();
-	let keycode = KeyCode::iter().enumerate().find(|(idx, _code)| index==*idx).unwrap_or((0,KeyCode::RESERVED)).1 as i32;
+	let keycode = KeyCode::iter().enumerate().find(|(idx, _code)| index==*idx).unwrap_or((0,KeyCode::RESERVED)).1 as i16;
 	logging::log!("drop index {}, data {:?}, keycode {}",
 		      index,
 		      KeyCode::VARIANTS[index],
@@ -408,7 +427,12 @@ fn KeyboardButton(
 	    for key in keys.iter_mut() {
 		if key.selected {
 		    key.selected = false;
-		    key.bind_key = index;
+		    match ui_state.get().layer {
+			0 => key.bind_key.0 = keycode,
+			1 => key.bind_key.1 = keycode,
+			_ => {},
+		    }
+		    
 		}
 	    }
 	});
@@ -452,11 +476,37 @@ fn KeyboardButton(
  pub fn Keyboard_View(
 
  ) -> impl IntoView {
+     let pathname = use_location().pathname;
+     let ui_state = use_context::<RwSignal<UiState>>().unwrap();
      
+     let switch_layer = move |_| {
+	 ui_state.update(|state| {
+	     if state.layer == 0 {
+		 state.layer = 1;
+	     } else {
+		 state.layer = 0;
+	     }
+	 });
+     };
 
+     let layer_name = create_memo(move |_| {
+	 if ui_state.get().layer == 0 {
+	     "Default".to_string()
+	 } else {
+	     "Fn Layer".to_string()
+	 }
+     });
+     
      view! {
 
-	<div class="card">
+	 <div class="card">
+
+	     <Show when=move || pathname.get().as_str()=="/keymap">
+	     <div class="card-header card-header-info">
+	     <button class="btn btn-primary ml-auto" on:click=switch_layer>{layer_name}</button>
+	     </div>
+	     </Show>
+	     
 
 	    <div class="card-body text-center" style:overflow="scroll" style:padding="0 0">
 	 <div style:min-width=move || format!("{}px", 15*WIDTH)>
@@ -503,7 +553,7 @@ fn KeyboardButton(
 #[component]
 pub fn Sidebar() -> impl IntoView {
     let path_name = use_location().pathname;
-
+        
     view! {
 	  <div class="sidebar" data-color="purple" data-background-color="black" data-image="public/assets/img/sidebar-1.jpg">
 	    <div class="logo"><a class="simple-text logo-normal">
@@ -558,151 +608,29 @@ pub fn Navbar(
 
     let adc_vec = use_context::<RwSignal<Vec<u32>>>().unwrap();
     let (dialog_switch, set_dialog_switch) = create_signal(false);
-    // let title = move || match path_name.get().as_str(). {
-    // 	"/performance" => "Performance",
-    // 	"/keymap" => "KeyMap",
-    // 	"/rgb" => "R G B",
-    // 	_ => "HOME"
-    // };
+
     let title = move || path_name.get().to_ascii_uppercase().as_str()[1..].to_string();
     let upload = move |_| {
 	spawn_local(async move {
-	    #[derive(serde::Serialize)]
-	    struct Filter {
-		vendorId: Option<u16>,
-		productId: Option<u16>,
-		#[serde(rename = "usagePage")]
-		pub usage_page: Option<u16>,
-		pub usage: Option<u16>,
-	    }
-	    if uistate.get().hid_device.is_none() {
-		let window = web_sys::window().unwrap();
-		let nav = window.navigator();
-		let devices_promise = nav.hid()
-		    .request_device(&web_sys::HidDeviceRequestOptions::new(&serde_wasm_bindgen::to_value(&[Filter{
-			vendorId:Some(0x0484),
-			productId:Some(0x572f),
-			// usage_page:Some(0xff00),
-			// usage:Some(0x00),
-			usage_page: None,
-			usage: None,
-		    }]).unwrap()));
-		let devices = wasm_bindgen_futures::JsFuture::from(devices_promise).await.unwrap();
-		let devs_array = devices.dyn_ref::<js_sys::Array>().expect("FAILED to cast the returned value from `request_device()`.");
-		let device: JsValue = devs_array.at(0); //interface 0
-		let device: HidDevice  = device.dyn_into().expect("FAILED to cast `JsValue` in array into `HidDevice`.");
-		//open device
-		wasm_bindgen_futures::JsFuture::from(device.open()).await.expect("Cannot Open Device");
-		//		let device: &HidDevice = device .dyn_ref::<HidDevice>().expect("FAILED to cast `JsValue` in array into `HidDevice`.");
-		let closure = Closure::<dyn FnMut(_)>::new(move |e: web_sys::HidConnectionEvent| {
-		    let event_dev = e.device();
-		    if let Some(dev) = uistate.get().hid_device {
-			if event_dev.product_name() == dev.product_name(){
-			    logging::log!("Disconnected");
-			    uistate.update(|v| v.hid_device=None)
-			}
-		    }
-		});
-		nav.hid().set_ondisconnect(Some(closure.as_ref().unchecked_ref()));
-		closure.forget();
-		
-		
-
-		let closure = Closure::<dyn FnMut(_)>::new(move |e: web_sys::HidInputReportEvent| {
-		    let dataview = e.data();
-		    let rid = e.report_id();
-		    let ofs = dataview.byte_offset();
-		    let len = dataview.byte_length();
-		    let ba: Vec<u8> = (0..len).map(|i| { dataview.get_uint8(i+ofs) }).collect();
-		    if rid == 2 {
-			//			logging::log!("{:?}", ba);
-			let adc_data_page = ba[0] as usize;
-			let mut data: u32 = 0;
-			for (idx, x) in ba[1..17].iter().enumerate() {
-			    if idx%2==1 {
-				data += x.clone() as u32;
-				set_adc_datas.update(|v| v.array[STM2RS[idx/2 + adc_data_page*8]] = data);
-				if uistate.get().key_monitor == STM2RS[idx/2 + adc_data_page*8] as u32 {
-				    adc_vec.update(|v| {
-					v.push(data);
-					if v.len() > 128 {
-					    v.remove(0);
-					}
-				    });
-				}
-				
-			    } else {
-				data = x.clone() as u32 *256;
-			    }
-			}
-			
-		    }
-		});
-		device.set_oninputreport(Some(closure.as_ref().unchecked_ref()));
-		closure.forget();
-		
-		uistate.update(|state| state.hid_device=Some(device));
-	    } else {
-		if let Some(device) = uistate.get().hid_device {
-
-		    //open device
-
-		    if device.opened().not() {
-			wasm_bindgen_futures::JsFuture::from(device.open()).await.expect("Cannot Open Device");
-		    }
-
-
-		    let mut send_buf = [0u8; 64];
-		    for (page_num, keys) in keyboard_state.get().keys.chunks(4).enumerate() {
-			match path_name.get().as_str() {
-			    "/performance" => {
-				send_buf[0] = 2;
-				send_buf[1] = page_num as u8;
-				for i in 0..4 {
- 				    send_buf[2 + i*4+0] = keys[i].value.0 as u8 | ((keys[i].mode << 7) as u8);
-				    send_buf[2 + i*4+1] = keys[i].value.1 as u8;
-				    send_buf[2 + i*4+2] = keys[i].value.2 as u8;
-				    send_buf[2 + i*4+3] = keys[i].value.3 as u8;
-				}
-			    },
-			    "/rgb" => {
-				send_buf[0] = 2;
-				send_buf[1] = page_num as u8 + 16;
-				for i in 0..4 {
-				    let rgb_raw = keys[i].rgb_raw;
- 				    send_buf[2 + i*4+0] = (rgb_raw>>24) as u8;
-				    send_buf[2 + i*4+1] = (rgb_raw>>16) as u8;
-				    send_buf[2 + i*4+2] = (rgb_raw>>8) as u8;
-				    send_buf[2 + i*4+3] = (rgb_raw>>0) as u8;
-				}
-			    },
-			    "/keymap" => {},
-			    _ => {},
-			}
-			logging::log!("test: [page: {} payload: {:?}]", page_num, &send_buf[0..18]);
-			if device.opened() {
-			    let res = wasm_bindgen_futures::JsFuture::from(device.send_report_with_u8_array(2, &mut send_buf[1..18])).await;
-			    match res {
-				Err(err) => logging::log!("{:?}", err),
-				_ => {},
-			    }
-			    //		    std::thread::sleep(std::time::Duration::from_millis(1));
-			} else {
-			    logging::log!("Device is not opend");
-			}
-
-		    }
-		    logging::log!("Send Report");
-		    set_dialog_switch.set(true);
-		    //close device
-		    //		wasm_bindgen_futures::JsFuture::from(device.close()).await.expect("Error While Closing the Device");
+	    if let Some(device) = uistate.get().hid_device {
+		let mut send_buf = [0u8; 64];
+		match path_name.get().as_str() {
+		    "/performance" => {
+			send_performance_report(&mut send_buf, &keyboard_state.get(), &device).await;
+		    },
+		    "/rgb" => {
+			send_rgb_report(&mut send_buf, &keyboard_state.get(), &device).await;
+		    },
+		    "/keymap" => {
+			send_keymap_report(&mut send_buf, &keyboard_state.get(), &device).await;
+		    },
+		    _ => {},
 		}
+		logging::log!("Send Report");
+		set_dialog_switch.set(true);
+	    } else {
+		init_hid_device(uistate, keyboard_state, set_adc_datas, adc_vec).await;
 	    }
-//	    logging::log!("{:?}", result);
-	    // let payload = keyboard_state.get().keys;
-	    // let args = to_value(&MessageArgs {payload: &serde_json::to_string_pretty(&payload).unwrap()}).unwrap();
-	    // let msg = invoke("upload_settings", args).await.as_string().unwrap();
-	    // logging::log!("{}", msg);
 	});
     };
 
@@ -791,20 +719,7 @@ pub fn KeySettings() -> impl IntoView {
     
     let mode = create_memo(move |_| uistate.get().mode);
     let keyboard_state = use_context::<RwSignal<Keyboard>>().unwrap();
-    let selected_num = create_memo(move |_| keyboard_state.get().keys.iter().filter(|key| key.selected).count());
-
-    // create_effect(move |_| {
-    // 	if selected_num.get() == 1 {
-    // 	    let state = keyboard_state.get();
-    // 	    let index = state.keys.iter().enumerate().filter(|(_idx, x)| x.selected == true).collect::<Vec<_>>()[0].0;
-    // 	    mode.1.set(state.keys[index].mode.to_string());
-    // 	    activation_value.1.set(state.keys[index].value.0.to_string());
-    // 	    trigger_value.1.set(state.keys[index].value.1.to_string());
-    // 	    reset_value.1.set(state.keys[index].value.2.to_string());
-    // 	    lower_deadzone.1.set(state.keys[index].value.3.to_string());
-    // 	}
-    // });
- 
+    let selected_num = create_memo(move |_| keyboard_state.get().keys.iter().filter(|key| key.selected).count()); 
     
     let update_activation_value =  move |ev| {
         let v = event_target_value(&ev);

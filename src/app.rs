@@ -5,6 +5,7 @@ use tauri_sys::window;
 use wasm_bindgen::prelude::*;
 use leptos_router::*;
 use web_sys::{Hid, HidDeviceRequestOptions, HidDevice, EventTarget};
+use crate::{component::*, keyboard::*};
 
 
 #[wasm_bindgen]
@@ -56,7 +57,6 @@ pub fn ripple_effect() -> Result<(), JsValue> {
     Ok(())
 }
 
-use crate::{component::*, keyboard::{Keyboard, KeyCode}};
 
 
 #[derive(Debug, Clone)]
@@ -64,6 +64,7 @@ pub struct UiState {
     pub hid_device: Option<HidDevice>,
     pub mode: u32,
     pub key_monitor: u32,
+    pub layer: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -79,6 +80,7 @@ pub fn App() -> impl IntoView {
 	hid_device: None,
 	mode: 0,
 	key_monitor: 0,
+	layer: 0,
     });
     provide_context(uistate);
     provide_context(keyboard_state);
@@ -91,6 +93,30 @@ pub fn App() -> impl IntoView {
     let navbar_switch = create_signal(false);
 
     ripple_effect().unwrap();
+
+
+    let hid_device = create_memo(move |_| uistate.get().hid_device);
+    create_resource(move||hid_device.get(), move |_| async move {
+	if let Some(device) = hid_device.get() {
+	    if device.opened() == false {
+		wasm_bindgen_futures::JsFuture::from(device.open()).await.expect("Cannot Open Device");
+	    }
+	    logging::log!("hid resource");
+	    request_input(&device).await;
+	}
+    });
+
+    // let window = web_sys::window().unwrap();
+    // let nav = window.navigator();
+    // let closure = Closure::<dyn FnMut(_)>::new(move |e: web_sys::HidConnectionEvent| {
+    // 	let device = e.device();
+    // 	if device.vendor_id() == 0x0484 && device.product_id() == 0x572f {
+    // 	    uistate.update(|state| state.hid_device=Some(device));
+    // 	}
+    // });
+    // nav.hid().set_onconnect(Some(closure.as_ref().unchecked_ref()));
+    // closure.forget();
+
 
 
     view! {
