@@ -46,8 +46,8 @@ pub fn Rgb() -> impl IntoView {
 	    for key in keys.iter_mut() {
 		if key.selected || number==0 {
 		    key.rgb_raw = key.rgb_raw & 0xff000000;
-		    key.rgb_raw = key.rgb_raw | ((color[0] as u32)<<16);
 		    key.rgb_raw = key.rgb_raw | ((color[1] as u32)<<8);
+		    key.rgb_raw = key.rgb_raw | ((color[0] as u32)<<16);
 		    key.rgb_raw = key.rgb_raw | ((color[2] as u32)<<0);
 		}
 	    }
@@ -100,7 +100,7 @@ pub fn Rgb() -> impl IntoView {
 	    <form>
 	    <div class="form-group">
 	    <label for="color">Color</label>
-	    <input id="color" type="color" on:change=on_color_change/>
+	    <input id="color" type="color" on:input=on_color_change/>
 	    </div>
 	    
 	    <div class="form-group">
@@ -613,6 +613,11 @@ pub fn Navbar(
     let upload = move |_| {
 	spawn_local(async move {
 	    if let Some(device) = uistate.get().hid_device {
+		keyboard_state.update(|Keyboard{keys,..}| {
+		    for key in keys {
+			key.selected = false;
+		    }
+		});
 		let mut send_buf = [0u8; 64];
 		match path_name.get().as_str() {
 		    "/performance" => {

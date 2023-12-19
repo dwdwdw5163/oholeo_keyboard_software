@@ -616,10 +616,6 @@ video {
   margin-left: auto;
 }
 
-.mr-auto {
-  margin-right: auto;
-}
-
 .block {
   display: block;
 }
@@ -658,11 +654,6 @@ video {
 
 .text-center {
   text-align: center;
-}
-
-.text-xs {
-  font-size: 0.75rem;
-  line-height: 1rem;
 }
 
 .outline {
