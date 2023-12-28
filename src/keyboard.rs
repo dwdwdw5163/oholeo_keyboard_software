@@ -394,6 +394,7 @@ pub async fn send_rgb_report(
 	logging::log!("test: [page: {} payload: {:?}]", page_num, &send_buf[0..18]);
 	send_report(device, send_buf).await;
     }
+
 }
 
 fn keymap_input(
@@ -428,6 +429,16 @@ pub async fn send_keymap_report(
 	logging::log!("test: [page: {} payload: {:?}]", page_num, &send_buf[0..18]);
 	send_report(device, send_buf).await;
     }
+}
+
+pub async fn send_flash_command(
+    send_buf: &mut [u8],
+    device: &HidDevice,
+) {
+    //flash
+    send_buf[0] = 2;
+    send_buf[1] = 254;
+    send_report(device, send_buf).await;
 }
 
 async fn send_report(

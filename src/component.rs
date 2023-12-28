@@ -106,14 +106,14 @@ pub fn Rgb() -> impl IntoView {
 	    <div class="form-group">
 	    <label for="global-mode">Global Mode</label>
 	    <select id="global-mode" class="form-control" on:change=on_gm_change>
-	{RGB_GLOBAL_MODE::iter().map(|gm| view! {<option>{gm.to_string()}</option>} ).collect_view()}
+	{RGB_GLOBAL_MODE::iter().map(|gm| view! {<option class="text-black">{gm.to_string()}</option>} ).collect_view()}
 	    </select>
 	    </div>
 
 	    <div class="form-group">
 	    <label for="mode">Mode</label>
 	    <select id="mode" class="form-control" on:change=on_mode_change>
-	{RGB_MODE::iter().map(|m| view! {<option>{m.to_string()}</option>} ).collect_view()}
+	{RGB_MODE::iter().map(|m| view! {<option class="text-black">{m.to_string()}</option>} ).collect_view()}
 	    </select>
 	    </div>
 
@@ -138,10 +138,10 @@ pub fn Profiles() -> impl IntoView {
     use strum::IntoEnumIterator;
 
 
-    let on_dragstart = move |event: ev::DragEvent| {
-	let data_transfer = event.data_transfer().unwrap();
-	data_transfer.set_data("keycode", "test").unwrap();
-    };
+    // let on_dragstart = move |event: ev::DragEvent| {
+    // 	let data_transfer = event.data_transfer().unwrap();
+    // 	data_transfer.set_data("keycode", "test").unwrap();
+    // };
     let on_dragend = move |event: ev::DragEvent| {
 	let data_transfer = event.data_transfer().unwrap();
 	data_transfer.clear_data().unwrap();
@@ -639,6 +639,37 @@ pub fn Navbar(
 	});
     };
 
+    let flash = move |_| {
+	spawn_local(async move {
+	    if let Some(device) = uistate.get().hid_device {
+		keyboard_state.update(|Keyboard{keys,..}| {
+		    for key in keys {
+			key.selected = false;
+		    }
+		});
+		let mut send_buf = [0u8; 64];
+		match path_name.get().as_str() {
+		    "/performance" => {
+			send_performance_report(&mut send_buf, &keyboard_state.get(), &device).await;
+		    },
+		    "/rgb" => {
+			send_rgb_report(&mut send_buf, &keyboard_state.get(), &device).await;
+		    },
+		    "/keymap" => {
+			send_keymap_report(&mut send_buf, &keyboard_state.get(), &device).await;
+		    },
+		    _ => {},
+		}
+		logging::log!("Send Report");
+		set_dialog_switch.set(true);
+		send_flash_command(&mut send_buf, &device).await;
+	    } else {
+		init_hid_device(uistate, keyboard_state, set_adc_datas, adc_vec).await;
+	    }
+	});
+    };
+
+    let some_hid_device = create_memo(move |_| uistate.get().hid_device.is_some());
 	
     view! {
 
@@ -648,8 +679,8 @@ pub fn Navbar(
             <a class="navbar-brand" >{title}<div class="ripple-container"></div></a>
             </div>
 
-	    <button type="submit" class="btn ml-auto overflow-hidden relative" class:btn-success=move||uistate.get().hid_device.is_some() on:click=upload>{move|| {
-		if uistate.get().hid_device.is_some() {
+	    <button type="submit" class="btn ml-auto overflow-hidden relative" class:btn-success=move||some_hid_device.get() on:click=upload>{move|| {
+		if some_hid_device.get() {
 		    "Save to Keyboard"
 		} else {
 		    "Connect"
@@ -657,6 +688,13 @@ pub fn Navbar(
 
 	    }}
 	</button>
+
+	    <Show when=move||some_hid_device.get()>
+	    <button class="btn btn-primary" on:click=flash>
+	    <i class="material-icons">bolt</i>
+	    "Flash"
+	    </button></Show>
+
 
 	    <div class="modal fade" class:show=move||dialog_switch.get() tabindex="-1" role="dialog"
 	    style:display=move||{if dialog_switch.get() {"block"}else{"none"}}
