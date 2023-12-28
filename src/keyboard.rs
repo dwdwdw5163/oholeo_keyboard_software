@@ -220,12 +220,6 @@ struct Filter {
     pub usage: Option<u16>,
 }
 
-pub fn register_hid_event(
-
-) {
-    
-}
-
 pub async fn init_hid_device(
     uistate: RwSignal<UiState>,
     keyboard_state: RwSignal<Keyboard>,

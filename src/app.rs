@@ -25,7 +25,7 @@ pub fn ripple_effect() -> Result<(), JsValue> {
     let doc = document.clone();
     let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
         let target = event.target().unwrap().dyn_into::<web_sys::Element>().unwrap();
-//	logging::log!("{:?}",target.class_name());
+	//	logging::log!("{:?}",target.class_name());
         if target.class_list().contains("btn") || target.class_list().contains("ripple-effect") {
 	    let ripple = doc.clone().create_element("div").unwrap();
 	    ripple.set_class_name("ripple");
@@ -65,6 +65,7 @@ pub struct UiState {
     pub mode: u32,
     pub key_monitor: u32,
     pub layer: u32,
+    pub mousedown: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -81,6 +82,7 @@ pub fn App() -> impl IntoView {
 	mode: 0,
 	key_monitor: 0,
 	layer: 0,
+	mousedown: false,
     });
     provide_context(uistate);
     provide_context(keyboard_state);
@@ -92,7 +94,42 @@ pub fn App() -> impl IntoView {
     
     let navbar_switch = create_signal(false);
 
-    ripple_effect().unwrap();
+//    ripple_effect().unwrap();
+    {
+	let window = web_sys::window().unwrap();
+	let document = std::rc::Rc::new(window.document().expect("should have a Document"));
+
+
+
+	let doc = document.clone();
+	let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
+	    uistate.update(|state| state.mousedown=true);
+            let target = event.target().unwrap().dyn_into::<web_sys::Element>().unwrap();
+	    //	logging::log!("{:?}",target.class_name());
+            if target.class_list().contains("btn") || target.class_list().contains("ripple-effect") {
+		let ripple = doc.clone().create_element("div").unwrap();
+		ripple.set_class_name("ripple");
+		let ripple_container = doc.clone().create_element("div").unwrap();
+		ripple_container.set_class_name("ripple-container");
+		ripple_container.append_child(&ripple).unwrap();
+		
+		let style = format!("top: {}px; left: {}px", event.offset_y(), event.offset_x());
+		ripple.set_attribute("style", &style).unwrap();
+		//	    logging::log!("cnt: {:?} name: {:?}", target.child_element_count(), target.class_name());
+		target.append_child(&ripple_container).unwrap();
+		set_timeout(move || {target.remove_child(&ripple_container).unwrap();}, Duration::from_secs(1));
+            }
+	}) as Box<dyn FnMut(_)>);
+
+	document.clone().add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref()).unwrap();
+	closure.forget();
+
+	let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
+	    uistate.update(|state| state.mousedown=false);
+	}) as Box<dyn FnMut(_)>);
+	document.add_event_listener_with_callback("mouseup", closure.as_ref().unchecked_ref()).unwrap();
+	closure.forget();
+    }
 
 
     let hid_device = create_memo(move |_| uistate.get().hid_device);

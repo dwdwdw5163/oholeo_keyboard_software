@@ -392,6 +392,39 @@ fn KeyboardButton(
 	}
     };
 
+    let on_mouseenter = move |_| {
+	if ui_state.get().mousedown {
+	    if location.get().as_str() == "/debug" {
+//		//set monitor
+//		ui_state.update(|v| v.key_monitor=index as u32);
+		keyboard_state.update(|Keyboard{keys, ..}| {
+		    for (idx, key) in keys.iter_mut().enumerate() {
+			if idx == index {
+			    key.selected = key.selected.not();
+			} else {
+			    key.selected = false;
+			}
+		    }
+		});
+	    } else {
+		ui_state.update(|state| {
+		    state.mode=keyboard_state.get().keys[index].mode;
+		});
+		keyboard_state.update(|Keyboard{keys, ..}| {
+		    for (idx, key) in keys.iter_mut().enumerate() {
+			if idx == index {
+			    key.selected = key.selected.not();
+			} else {
+			    //		    key.selected = false;
+			}
+		    }
+		});
+
+	    }
+	}
+    };
+    
+
     let on_dragenter = move |event: ev::DragEvent| {
 	event.prevent_default();
 	keyboard_state.update(|Keyboard{keys, ..}| {
@@ -455,11 +488,12 @@ fn KeyboardButton(
 	    style:position="relative"
 	    style:width="100%"
 	    style:top="0px"
-	    on:click=on_click
+	    on:mousedown=on_click
+	    on:mouseenter=on_mouseenter
 	    
 	    class:active=move || keyboard_state.get().keys[index].selected>
 
-	    <div class="pointer-events-none">
+	    <div class="pointer-events-none select-none">
 	    <Keycap_value index/>
 	    </div>
 	    // <p style:font-weight="bold" style:height="24px" style:margin="0 0">{move || KEYBOARD_CHARS[keyboard_state.get().keys[index].bind_key as usize]}</p>
@@ -648,19 +682,10 @@ pub fn Navbar(
 		    }
 		});
 		let mut send_buf = [0u8; 64];
-		match path_name.get().as_str() {
-		    "/performance" => {
-			send_performance_report(&mut send_buf, &keyboard_state.get(), &device).await;
-		    },
-		    "/rgb" => {
-			send_rgb_report(&mut send_buf, &keyboard_state.get(), &device).await;
-		    },
-		    "/keymap" => {
-			send_keymap_report(&mut send_buf, &keyboard_state.get(), &device).await;
-		    },
-		    _ => {},
-		}
-		logging::log!("Send Report");
+		send_performance_report(&mut send_buf, &keyboard_state.get(), &device).await;
+		send_rgb_report(&mut send_buf, &keyboard_state.get(), &device).await;
+		send_keymap_report(&mut send_buf, &keyboard_state.get(), &device).await;
+		logging::log!("FLASH");
 		set_dialog_switch.set(true);
 		send_flash_command(&mut send_buf, &device).await;
 	    } else {
