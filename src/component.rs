@@ -28,6 +28,8 @@ struct Payload {
 pub const WIDTH: u32 = 64;
 pub const HEIGHT: u32 = 64;
 
+
+
 #[component]
 pub fn Rgb() -> impl IntoView {
     use hex;
@@ -133,6 +135,8 @@ pub fn Rgb() -> impl IntoView {
     }
 }
 
+
+
 #[component]
 pub fn Profiles() -> impl IntoView {
     use strum::IntoEnumIterator;
@@ -148,6 +152,7 @@ pub fn Profiles() -> impl IntoView {
     };
     
     view! {
+	<div class="col-lg-6 col-md-12">
 	<div class="card">
 	    <div class="card-header card-header-info">
 	    
@@ -193,7 +198,12 @@ pub fn Profiles() -> impl IntoView {
 
 	    </div>
 	    
-	</div>
+	    </div>
+
+	    
+	    </div>
+
+
     }
 }
 
@@ -378,6 +388,10 @@ fn KeyboardButton(
 	} else {
 	    ui_state.update(|state| {
 		state.mode=keyboard_state.get().keys[index].mode;
+                state.activation_value=keyboard_state.get().keys[index].value.0 as u8;
+                state.trigger_value=keyboard_state.get().keys[index].value.1 as u8;
+                state.reset_value=keyboard_state.get().keys[index].value.2 as u8;
+                state.lower_deadzone=keyboard_state.get().keys[index].value.3 as u8;
 	    });
 	    keyboard_state.update(|Keyboard{keys, ..}| {
 		for (idx, key) in keys.iter_mut().enumerate() {
@@ -409,6 +423,10 @@ fn KeyboardButton(
 	    } else {
 		ui_state.update(|state| {
 		    state.mode=keyboard_state.get().keys[index].mode;
+                    state.activation_value=keyboard_state.get().keys[index].value.0 as u8;
+                    state.trigger_value=keyboard_state.get().keys[index].value.1 as u8;
+                    state.reset_value=keyboard_state.get().keys[index].value.2 as u8;
+                    state.lower_deadzone=keyboard_state.get().keys[index].value.3 as u8;
 		});
 		keyboard_state.update(|Keyboard{keys, ..}| {
 		    for (idx, key) in keys.iter_mut().enumerate() {
@@ -513,23 +531,7 @@ fn KeyboardButton(
      let pathname = use_location().pathname;
      let ui_state = use_context::<RwSignal<UiState>>().unwrap();
      
-     let switch_layer = move |_| {
-	 ui_state.update(|state| {
-	     if state.layer == 0 {
-		 state.layer = 1;
-	     } else {
-		 state.layer = 0;
-	     }
-	 });
-     };
-
-     let layer_name = create_memo(move |_| {
-	 if ui_state.get().layer == 0 {
-	     "Default".to_string()
-	 } else {
-	     "Fn Layer".to_string()
-	 }
-     });
+     let layer = create_memo(move |_| ui_state.get().layer);
      
      view! {
 
@@ -537,7 +539,9 @@ fn KeyboardButton(
 
 	     <Show when=move || pathname.get().as_str()=="/keymap">
 	     <div class="card-header card-header-info">
-	     <button class="btn btn-primary ml-auto" on:click=switch_layer>{layer_name}</button>
+	     <button class="btn ml-auto" class:btn-primary=move||layer.get()==0 on:click=move |_| ui_state.update(|state| state.layer=0)>"Default Layer"</button>
+	     <button class="btn ml-auto" class:btn-primary=move||layer.get()==1 on:click=move |_| ui_state.update(|state| state.layer=1)>"Fn Layer"</button>
+
 	     </div>
 	     </Show>
 	     
@@ -774,15 +778,34 @@ pub fn DashBoard(
 
 }
 
+#[component]
+pub fn Unselect() -> impl IntoView {
+    let keyboard_state = use_context::<RwSignal<Keyboard>>().unwrap();
+    let selected_num = create_memo(move |_| keyboard_state.get().keys.iter().filter(|key| key.selected).count());
+
+    view! {
+        <Show when=move || selected_num.get() != 0
+            fallback=|| view! {}>
+            
+                <div class="fixed-plugin" style:width="200px" style:top="70px">
+            <button class="btn btn-primary"
+            on:click=move |_| {keyboard_state.update(|state| state.keys.iter_mut().map(|key| key.selected=false).collect()) }
+            >"Unselect All Keys"</button>
+                </div>
+            
+        </Show>
+        
+    }
+}
 
 #[component]
 pub fn KeySettings() -> impl IntoView {
     let uistate = use_context::<RwSignal<UiState>>().unwrap();
 
-    let activation_value = create_signal("50".to_string());
-    let trigger_value = create_signal("5".to_string());
-    let reset_value = create_signal("5".to_string());
-    let lower_deadzone = create_signal("35".to_string());
+    let activation_value = create_memo(move |_| uistate.get().activation_value);
+    let trigger_value = create_memo(move |_| uistate.get().trigger_value);
+    let reset_value = create_memo(move |_| uistate.get().reset_value);
+    let lower_deadzone = create_memo(move |_| uistate.get().lower_deadzone);
 
     
     let mode = create_memo(move |_| uistate.get().mode);
@@ -794,7 +817,7 @@ pub fn KeySettings() -> impl IntoView {
 	let value = v.parse::<u32>().unwrap();
 	if value>0 && value<=100 {
 	    let number = selected_num.get();
-            activation_value.1.set(v.clone());
+            uistate.update(|state| state.activation_value=value as u8);
 	    keyboard_state.update(|Keyboard{keys, ..}| {
 		for key in keys.iter_mut() {
 		    if key.selected || number==0 {
@@ -810,7 +833,7 @@ pub fn KeySettings() -> impl IntoView {
 	let value = v.parse::<u32>().unwrap();
 	if value>0 && value<=100 {
 	    let number = selected_num.get();
-            trigger_value.1.set(v.clone());
+            uistate.update(|state| state.trigger_value=value as u8);
 	    keyboard_state.update(|Keyboard{keys, ..}| {
 		for key in keys.iter_mut() {
 		    if key.selected || number==0 {
@@ -827,7 +850,7 @@ pub fn KeySettings() -> impl IntoView {
 	let value = v.parse::<u32>().unwrap();
 	if value>0 && value<=100 {
 	    let number = selected_num.get();
-            reset_value.1.set(v.clone());
+            uistate.update(|state| state.reset_value=value as u8);
 	    keyboard_state.update(|Keyboard{keys, ..}| {
 		for key in keys.iter_mut() {
 		    if key.selected || number==0{
@@ -843,7 +866,7 @@ pub fn KeySettings() -> impl IntoView {
 	let value = v.parse::<u32>().unwrap();
 	if value>0 && value<=100 {
 	    let number = selected_num.get();
-            lower_deadzone.1.set(v.clone());
+            uistate.update(|state| state.lower_deadzone=value as u8);
 	    keyboard_state.update(|Keyboard{keys, ..}| {
 		for key in keys.iter_mut() {
 		    if key.selected || number==0{
@@ -912,26 +935,26 @@ pub fn KeySettings() -> impl IntoView {
 	    "0" => view! {
 		<h5>"Activation Point"</h5>
 		    <div class="form-row" style="justify-content:space-around; align-items:center;">
-		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange0" prop:value=move||activation_value.0.get() on:input=update_activation_value/></span>
-		    <input type="number" class="form-control" min="1" max="100" style:width="10%" prop:value=move||activation_value.0.get() on:change=update_activation_value/>
+		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange0" prop:value=move||activation_value.get() on:input=update_activation_value/></span>
+		    <input type="number" class="form-control" min="1" max="100" style:width="10%" prop:value=move||activation_value.get() on:change=update_activation_value/>
 		    </div>
 	    }.into_view(),
 	    "1" => view! {
 		<h5>"Dynamic Trigger Travel"</h5>
 		    <div class="form-row" style="justify-content:space-around; align-items:center;">
-		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange1" prop:value=move||trigger_value.0.get() on:input=update_trigger_value/></span>
-		    <input type="number" class="form-control" min="1" max="100" style:width="10%" prop:value=move||trigger_value.0.get() on:change=update_trigger_value/>
+		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange1" prop:value=move||trigger_value.get() on:input=update_trigger_value/></span>
+		    <input type="number" class="form-control" min="1" max="100" style:width="10%" prop:value=move||trigger_value.get() on:change=update_trigger_value/>
 		    </div>
 		    
 		    <h5>"Dynamic Reset Travel"</h5>
 		    <div class="form-row" style="justify-content:space-around; align-items:center;">
-		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange2" prop:value=move||reset_value.0.get() on:input=update_reset_value/></span>
-		    <input type="number" class="form-control" min="1" max="100" style:width="10%" prop:value=move||reset_value.0.get() on:change=update_reset_value/>
+		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange2" prop:value=move||reset_value.get() on:input=update_reset_value/></span>
+		    <input type="number" class="form-control" min="1" max="100" style:width="10%" prop:value=move||reset_value.get() on:change=update_reset_value/>
 		    </div>
 		    <h5>"Lower DeadZone"</h5>
 		    <div class="form-row" style="justify-content:space-around; align-items:center;">
-		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange3" prop:value=move||lower_deadzone.0.get() on:input=update_lower_deadzone/></span>
-		    <input type="number" class="form-control" min="1" max="100" style:width="10%" prop:value=move||lower_deadzone.0.get() on:change=update_lower_deadzone/>
+		    <span style:width="80%"><input type="range" min="1" max="100" class="slider" id="myRange3" prop:value=move||lower_deadzone.get() on:input=update_lower_deadzone/></span>
+		    <input type="number" class="form-control" min="1" max="100" style:width="10%" prop:value=move||lower_deadzone.get() on:change=update_lower_deadzone/>
 		    
 		    </div>
 	    }.into_view(),

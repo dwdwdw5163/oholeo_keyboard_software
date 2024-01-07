@@ -66,6 +66,10 @@ pub struct UiState {
     pub key_monitor: u32,
     pub layer: u32,
     pub mousedown: bool,
+    pub activation_value: u8,
+    pub trigger_value: u8,
+    pub reset_value: u8,
+    pub lower_deadzone: u8,
 }
 
 #[derive(Debug, Clone)]
@@ -83,6 +87,10 @@ pub fn App() -> impl IntoView {
 	key_monitor: 0,
 	layer: 0,
 	mousedown: false,
+        activation_value: 30,
+        trigger_value: 3,
+        reset_value: 3,
+        lower_deadzone: 32,
     });
     provide_context(uistate);
     provide_context(keyboard_state);
@@ -160,7 +168,10 @@ pub fn App() -> impl IntoView {
 	
 	<Router>
 	   
-	<div class="wraper" class:nav-open=navbar_switch.0>
+	  <div class="wraper" class:nav-open=navbar_switch.0>
+
+
+            <Unselect/>
 
 	    <Sidebar/>
 
