@@ -3,33 +3,16 @@
 
 
 ## Prerequisites  
-    https://tauri.app/v1/guides/getting-started/prerequisites  
+    https://book.leptos.dev/getting_started/index.html  
 	Setup your udev rules to use hidapi.
 
 ## Usage  
-```
-rustup toolchain install nightly  
-rustup default nightly  
-```
-or only for this project
-```
-rustup toolchain install nightly  
-cd <into your project>  
-rustup override set nightly  
-```
-Make sure you've added the wasm32-unknown-unknown target so that Rust can compile your code to WebAssembly to run in the browser.  
-```
-rustup target add wasm32-unknown-unknown
-```
-then run
-```
-npm install -D tailwindcss
-npx tailwindcss -i ./input.css -o ./style/output.css
-cargo tauri dev
-```
+https://oholeo-keyboard-software.vercel.app/
 
 
 ## Build  
 ```
-cargo tauri build
+git clone https://github.com/dwdwdw5163/oholeo_keyboard_software.git
+cd oholeo_keyboard_software
+trunk build --release
 ```
