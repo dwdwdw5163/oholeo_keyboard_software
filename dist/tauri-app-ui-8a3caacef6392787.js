@@ -1168,7 +1168,7 @@ async function __wbg_init(input) {
     if (wasm !== undefined) return wasm;
 
     if (typeof input === 'undefined') {
-        input = new URL('tauri-app-ui-893ad704b1ab3f8f_bg.wasm', import.meta.url);
+        input = new URL('tauri-app-ui-8a3caacef6392787_bg.wasm', import.meta.url);
     }
     const imports = __wbg_get_imports();
 

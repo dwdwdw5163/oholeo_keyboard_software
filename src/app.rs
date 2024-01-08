@@ -44,15 +44,6 @@ pub fn ripple_effect() -> Result<(), JsValue> {
     document.clone().add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())?;
     closure.forget();
 
-//     let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
-//         let target = event.target().unwrap().dyn_into::<web_sys::Element>().unwrap();
-// 	logging::log!("{:?}", target.class_name());
-//         if target.class_name().as_str() == "ripple" {
-// //	    target.remove();
-//         }
-//     }) as Box<dyn FnMut(_)>);
-//     document.add_event_listener_with_callback("mouseup", closure.as_ref().unchecked_ref())?;
-//     closure.forget();
     
     Ok(())
 }
