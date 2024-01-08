@@ -435,6 +435,15 @@ pub async fn send_flash_command(
     send_report(device, send_buf).await;
 }
 
+pub async fn command_factoryreset(
+    device: &HidDevice,
+) {
+    let mut send_buf = [0u8; 64];
+    send_buf[0] = 2;
+    send_buf[1] = 253;
+    send_report(device, &mut send_buf).await;
+}
+
 async fn send_report(
     device: &HidDevice,
     send_buf: &mut [u8]

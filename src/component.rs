@@ -30,6 +30,8 @@ pub const HEIGHT: u32 = 64;
 
 
 
+
+
 #[component]
 pub fn Rgb() -> impl IntoView {
     use hex;
@@ -698,8 +700,25 @@ pub fn Navbar(
 	});
     };
 
+    let factory_reset = move |_| {
+	spawn_local(async move {
+	    if let Some(device) = uistate.get().hid_device {
+		command_factoryreset(&device).await;
+                logging::log!("FactoryReset");
+                set_dialog_switch.set(true);
+	    } else {
+		init_hid_device(uistate, keyboard_state, set_adc_datas, adc_vec).await;
+	    }
+	});
+    };
+
+    
+    
     let some_hid_device = create_memo(move |_| uistate.get().hid_device.is_some());
-	
+
+
+    let drop_down_show = create_rw_signal(false);
+    
     view! {
 
 	<nav class="navbar navbar-expand-lg navbar-transparent navbar-absolute fixed-top " id="navigation-example">
@@ -719,10 +738,23 @@ pub fn Navbar(
 	</button>
 
 	    <Show when=move||some_hid_device.get()>
-	    <button class="btn btn-primary" on:click=flash>
-	    <i class="material-icons">bolt</i>
-	    "Flash"
-	    </button></Show>
+            
+	    // <button class="btn btn-primary" on:click=flash>
+	    // <i class="material-icons">bolt</i>
+	    // "Flash"
+	// </button>
+            <div class="dropdown" class:show=move||drop_down_show.get()>
+            <button class="btn btn-primary dropdown-toggle" type="button" on:click=move|_|drop_down_show.update(|state| *state=state.not())>
+            "Flash Command"
+            </button>
+            <div class="dropdown-menu" class:show=move||drop_down_show.get() aria-labelledby="dropdownMenuButton">
+            <a class="dropdown-item" style:color="green" href="#" on:click=flash>Flash</a>
+            <a class="dropdown-item" style:color="red" href="#" on:click=factory_reset>"FactoryReset"</a>
+            </div>
+            </div>
+
+
+            </Show>
 
 
 	    <div class="modal fade" class:show=move||dialog_switch.get() tabindex="-1" role="dialog"
@@ -745,6 +777,8 @@ pub fn Navbar(
     </div>
   </div>
  </div>
+
+
 	    
             <button class="navbar-toggler collapsed" class:toggled=navbar_switch.0 type="button" on:click=move |_| {navbar_switch.1.update(|n| *n = n.not()) }>
 
@@ -787,7 +821,7 @@ pub fn Unselect() -> impl IntoView {
         <Show when=move || selected_num.get() != 0
             fallback=|| view! {}>
             
-                <div class="fixed-plugin" style:width="200px" style:top="70px">
+                <div class="fixed-plugin" style:width="200px" style:top="470px">
             <button class="btn btn-primary"
             on:click=move |_| {keyboard_state.update(|state| state.keys.iter_mut().map(|key| key.selected=false).collect()) }
             >"Unselect All Keys"</button>
@@ -797,6 +831,8 @@ pub fn Unselect() -> impl IntoView {
         
     }
 }
+
+
 
 #[component]
 pub fn KeySettings() -> impl IntoView {
